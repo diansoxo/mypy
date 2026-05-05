@@ -1,0 +1,211 @@
+#include "lexer.hpp"
+#include <cctype>
+
+namespace lexer {
+Lexer::Lexer(const std::string& source, const std::string& filename)
+    : source_(source), filename_(filename), pos_(0), line_(1), col_(1)
+{}
+
+bool Lexer::isAtEnd() const {
+    return pos_ >= source_.size();
+}
+
+char Lexer::current() const {
+    return isAtEnd() ? '\0' : source_[pos_];
+}
+
+char Lexer::peek(int offset) const {
+    int idx = pos_ + offset;
+    if (idx < 0 || idx >= static_cast<int>(source_.size())) return '\0';
+    return source_[idx];
+}
+
+char Lexer::advance() {
+    char ch = source_[pos_++];
+    if (ch == '\n') { line_++; col_ = 1;}
+    else { col_++; }
+    return ch;
+}
+
+Diagnostic Lexer::makeDiag(const std::string& msg) const {
+    return Diagnostic{filename_, line_, col_, msg};
+}
+
+void Lexer::skipWhitespaceAndComments() {
+    while (!isAtEnd()) {
+        char ch = current();
+
+        if (ch == '#') {
+            while (!isAtEnd() && current() != '\n')// однострочный комментарий: до конца строки, \n не поглощаем
+                advance();
+            continue;
+        }
+
+        if (ch == '\t') {//таб запрещен
+            break;
+        }
+        if (ch == ' ' || ch == '\r') {
+            advance();
+            continue;
+        }
+        break;
+    }
+}
+
+std::expected<Token, Diagnostic> Lexer::readNumber() {//число или ошибка?
+    int  startLine = line_;
+    int  startCol= col_;
+    std::string buf;
+    bool isFloat = false;
+
+    while (!isAtEnd() && std::isdigit(current()))
+        buf += advance();
+
+    if (current() == '.' && std::isdigit(peek())) {//точка после цифр тогда float но только если за точкой ещё цифра
+        isFloat = true;
+        buf += advance();
+        while (!isAtEnd() && std::isdigit(current()))
+            buf += advance();
+    }
+
+    TokenType t = isFloat ? TokenType::FLOAT_LITERAL : TokenType::INT_LITERAL;
+    return Token{t, buf, startLine, startCol};
+}
+
+std::expected<Token, Diagnostic> Lexer::readString() {//читаем строку
+    int startLine = line_;
+    int startCol= col_;
+    advance();// открывающая " 
+    std::string buf;
+
+    while (true) {
+        if (isAtEnd())
+            return std::unexpected(makeDiag("незакрытая строка"));
+
+        char ch = current();
+
+        if (ch == '\n')
+            return std::unexpected(makeDiag("строка не может содержать перевод строки"));
+
+        if (ch == '"') {
+            advance(); //закрывающая "
+            break;
+        }
+
+        if (ch == '\\') {
+            advance();// обратный слэш
+            if (isAtEnd())
+                return std::unexpected(makeDiag("незавершённая escape-последовательность"));
+
+            char esc = current();
+            switch (esc) {
+                case 'n': buf += '\n'; break;
+                case 't': buf += '\t'; break;
+                case '"': buf += '"'; break;
+                case '\\': buf += '\\'; break;
+                default: {
+                    std::string msg = "неизвестная escape-последовательность: \\";
+                    msg += esc;
+                    return std::unexpected(makeDiag(msg));
+                }
+            }
+            advance();
+            continue;
+        }
+        buf += advance();
+    }
+    return Token{TokenType::STRING_LITERAL, buf, startLine, startCol};
+}
+
+Token Lexer::readIdentOrKeyword() {
+    int startLine = line_;
+    int startCol  = col_;
+    std::string buf;
+
+    while (!isAtEnd() && (std::isalnum(current()) || current() == '_'))
+        buf += advance();
+
+    return Token{lookupKeyword(buf), buf, startLine, startCol};
+}
+
+std::expected<Token, Diagnostic> Lexer::nextToken() {
+    skipWhitespaceAndComments();
+
+    if (isAtEnd())
+        return Token{TokenType::EOF_TOKEN, "", line_, col_};
+
+    int  line= line_;
+    int  col = col_;
+    char ch= current();
+
+    if (ch == '\n') {// явный токен для конца строки
+        advance();
+        return Token{TokenType::NEWLINE, "\\n", line, col};
+    }
+
+    if (ch == '\t')//таб запрещены
+        return std::unexpected(makeDiag("табуляция запрещена: используйте пробелы для отступов"));
+
+    if (ch == '"')
+        return readString();
+
+    if (std::isdigit(ch))
+        return readNumber();
+
+    if (std::isalpha(ch) || ch == '_')
+        return readIdentOrKeyword();
+
+    advance();// операторы и разделители сначала сдвигаемся потом смотрим следующий символ
+    char nch = current();
+
+    if (ch == '=' && nch == '=') { advance(); return Token{TokenType::EQ, "==", line, col};}// составные операторы
+    if (ch == '!' && nch == '=') { advance(); return Token{TokenType::NEQ,"!=", line, col};}
+    if (ch == '<' && nch == '=') { advance(); return Token{TokenType::LTE, "<=", line, col};}
+    if (ch == '>' && nch == '=') { advance(); return Token{TokenType::GTE, ">=", line, col};}
+    if (ch == '-' && nch == '>') { advance(); return Token{TokenType::ARROW, "->", line, col};}
+    if (ch == '.' && nch == '.') { advance(); return Token{TokenType::DOTDOT, "..", line, col};}
+
+    switch (ch) {// одиночные символы
+        case '+': return Token{TokenType::PLUS, "+", line, col};
+        case '-': return Token{TokenType::MINUS, "-", line, col};
+        case '*': return Token{TokenType::STAR, "*", line, col};
+        case '/': return Token{TokenType::SLASH, "/", line, col};
+        case '%': return Token{TokenType::PERCENT, "%", line, col};
+        case '<': return Token{TokenType::LT,"<", line, col};
+        case '>': return Token{TokenType::GT, ">", line, col};
+        case '=': return Token{TokenType::ASSIGN, "=", line, col};
+        case '(': return Token{TokenType::LPAREN, "(", line, col};
+        case ')': return Token{TokenType::RPAREN, ")", line, col};
+        case '[': return Token{TokenType::LBRACKET, "[", line, col};
+        case ']': return Token{TokenType::RBRACKET, "]", line, col};
+        case '{': return Token{TokenType::LBRACE, "{", line, col};
+        case '}': return Token{TokenType::RBRACE, "}", line, col};
+        case ':': return Token{TokenType::COLON, ":", line, col};
+        case ',': return Token{TokenType::COMMA, ",", line, col};
+        case '.': return Token{TokenType::DOT, ".", line, col};
+        case ';': return Token{TokenType::SEMICOLON, ";", line, col};
+        default:  break;
+    }
+
+    std::string msg = "неожиданный символ: '";
+    msg += ch;
+    msg += "'";
+    return std::unexpected(makeDiag(msg));//возвращаем ошибку
+}
+
+std::expected<std::vector<Token>, Diagnostic> Lexer::tokenize() {
+    std::vector<Token> tokens;// складываем все токены
+
+    while (true) {
+        auto result = nextToken();
+
+        if (!result)//если ошибка
+            return std::unexpected(result.error());// достаем диагностику
+
+        tokens.push_back(*result);// если не ошибка
+        if (result->type == TokenType::EOF_TOKEN)
+            break;
+    }
+    return tokens;
+}
+}
