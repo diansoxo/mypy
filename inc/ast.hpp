@@ -13,22 +13,37 @@ struct Position {// Каждый узел хранит позицию в исх�
     int col;
 };
 
-// Выражение — это то что вычисляется в значение
-struct Expr {
-    Position pos;
-    virtual ~Expr() = default;
+struct Node {//единый корневой узел
+    Position pos;//изм
+    virtual ~Node() = default;
 };
 
-// Инструкция — это то что выполняется
-struct Stmt {
-    Position pos;
-    virtual ~Stmt() = default;
-};
+using NodePtr = std::unique_ptr<Node>;
 
+struct Expr : Node {};//изм
+struct Stmt : Node {};
+struct Decl : Node {};
 // Удобный псевдоним владеющий указатель на выражение
 // unique_ptr означает память освобождается автоматически
 using ExprPtr = std::unique_ptr<Expr>;//псевдонимы
 using StmtPtr = std::unique_ptr<Stmt>;
+using DeclPtr = std::unique_ptr<Decl>;//изм
+
+struct VarDecl : Stmt {//изм
+    bool is_mut;
+    std::string name;
+    std::string type_name;
+    ExprPtr init;
+
+    VarDecl(Position p, bool is_mut, std::string name, std::string type_name, ExprPtr init)
+        : is_mut(is_mut)
+        , name(std::move(name))
+        , type_name(std::move(type_name))
+        , init(std::move(init))
+    {
+        pos = p;
+    }
+};
 
 // Узлы выражений
 
@@ -52,24 +67,34 @@ struct Identifier : Expr {
     std::string name;
 };
 
-struct BinaryOp : Expr {
-    std::string op;// "+", "-", "*", "/", "%", "==", "!=", "<", ">", "<=", ">=", "and", "or"
+enum class BinOp {//изм
+    Add, Sub, Mul, Div, Mod,
+    Eq, Ne, Lt, Gt, Le, Ge,
+    And, Or
+};
+struct BinaryOp : Expr {//изм
+    BinOp op;
     ExprPtr left;
     ExprPtr right;
 };
 
-struct UnaryOp : Expr {
-    std::string op; // "-" или "not"
+enum class UnOp {//изм
+    Neg, // -
+    Not // not
+};
+
+struct UnaryOp : Expr {//изм
+    UnOp op;
     ExprPtr operand;
 };
 
-struct Call : Expr {
-    std::string name;
+struct Call : Expr {//изм
+    ExprPtr callee;//любое выражение
     std::vector<ExprPtr> args;
 };
 
-struct ArrayAccess : Expr {
-    std::string name;
+struct ArrayAccess: Expr {//изм
+    ExprPtr base;// любое выражение
     ExprPtr index;
 };
 
@@ -112,14 +137,6 @@ struct TupleLiteral : Expr {
 // Это тело функции, тело if, тело while и т.д.
 struct Block : Stmt {
     std::vector<StmtPtr> stmts;  // список инструкций внутри блока
-};
- 
-// Объявление переменной: let [mut] name [: type] = expr
-struct VarDecl : Stmt {
-    bool is_mut;
-    std::string name;
-    std::string type_name;
-    ExprPtr init;
 };
  
 struct Assign : Stmt {
@@ -173,14 +190,6 @@ struct Match : Stmt {
 };
  
 // Узлы объявлений
-
-struct Decl {// Базовый класс для всех объявлений
-    Position pos;
-    virtual ~Decl() = default;
-};
-
-using DeclPtr = std::unique_ptr<Decl>;
- 
 // Параметр функции: name : type
 struct Param {
     std::string name;
@@ -206,19 +215,15 @@ struct StructDecl: Decl {
  
 // Вариант перечисления: Name;
 struct EnumVariant {
-    std::string name;   // имя варианта
+    std::string name; // имя варианта
 };
  
 struct EnumDecl : Decl {
-    std::string name;                       // имя перечисления
-    std::vector<EnumVariant> variants;      // варианты
+    std::string name;
+    std::vector<EnumVariant> variants; // варианты
 };
  
 // Реализация методов: impl Name { func ... func ... }
-// Пример:
-//   impl Point {
-//       func distance(p: Point) -> float64 { ... }
-//   }
 struct ImplDecl : Decl {
     std::string name;
     std::vector<std::unique_ptr<FuncDef>> methods;
@@ -234,9 +239,6 @@ struct TypeAlias : Decl {
     std::string type_name; 
 };
  
-// Корень дерева вся программа
-// Программа список объявлений верхнего уровня
-// Инструкции и выражения допускаются только внутри функций
 struct Program {//список всех объявлений в файле
     std::vector<DeclPtr> decls;
 };
