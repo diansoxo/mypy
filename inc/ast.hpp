@@ -132,15 +132,12 @@ struct TupleLiteral : Expr {
 };
 
 // Узлы инструкций
-
-// Блок инструкций: { stmt1 stmt2 ... }
-// Это тело функции, тело if, тело while и т.д.
 struct Block : Stmt {
     std::vector<StmtPtr> stmts;  // список инструкций внутри блока
 };
  
 struct Assign : Stmt {
-    std::string name;// имя переменной
+    ExprPtr target;
     ExprPtr value;// новое значение
 };
  
@@ -226,12 +223,12 @@ struct EnumDecl : Decl {
 // Реализация методов: impl Name { func ... func ... }
 struct ImplDecl : Decl {
     std::string name;
-    std::vector<std::unique_ptr<FuncDef>> methods;
+    std::vector<DeclPtr> methods;//изм
 };
  
 struct NamespaceDecl : Decl {
     std::string name; 
-    std::vector<std::unique_ptr<FuncDef>> funcs;
+    std::vector<DeclPtr> decls;//изм
 };
  
 struct TypeAlias : Decl {
