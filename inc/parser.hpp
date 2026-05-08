@@ -27,14 +27,19 @@ struct Diagnostic {
 class Parser {
 public:
 Parser(std::vector<Token> tokens, const std::string& filename);//список токенов из лексера
-std::expected<Program, Diagnostic> parse();//дерево получаем или ошибка
+struct ParseResult {
+    Program program;
+    std::vector<Diagnostic> errors;
+    bool ok() const { return errors.empty(); }
+};
+ParseResult parse();//дерево получаем или ошибка
 
 private:
     std::vector<Token> tokens_; //все токены от лексера
     size_t pos_;// текущая позиция в tokens_
     std::string filename_;// имя файла для диагностики
-
-    //Нагивация
+    std::vector<Diagnostic> diagnostics_;//изм
+    //Навигация
     const Token& current() const;
     const Token& peek(int offset = 1) const;
     const Token& advance();
@@ -47,6 +52,8 @@ private:
 
     // Создать диагностику на текущей позиции
     Diagnostic makeDiag(const std::string& msg) const;
+void emitDiag(const std::string& msg); //изм
+void synchronize();//изм
     // объявления
     std::expected<DeclPtr, Diagnostic> parseDecl();
     std::expected<std::unique_ptr<FuncDef>, Diagnostic> parseFuncDef();
@@ -68,22 +75,16 @@ private:
     std::expected<StmtPtr, Diagnostic> parseFor();
     std::expected<StmtPtr, Diagnostic> parseMatch();
 
-
-    // Уровень 1: or  (самый низкий приоритет)
+//приоритеты
     std::expected<ExprPtr, Diagnostic> parseExpr();
-    // Уровень 2: and
     std::expected<ExprPtr, Diagnostic> parseLogicalOr();
-    // Уровень 3: сравнения == != < > <= >=
     std::expected<ExprPtr, Diagnostic> parseLogicalAnd();
-    // Уровень 4: + -
+    std::expected<ExprPtr, Diagnostic> parseEquality();
     std::expected<ExprPtr, Diagnostic> parseComparison();
-    // Уровень 5: * / %
     std::expected<ExprPtr, Diagnostic> parseSum();
-    // Уровень 6: унарные not -
     std::expected<ExprPtr, Diagnostic> parseTerm();
-    // Уровень 7: унарные операторы
     std::expected<ExprPtr, Diagnostic> parseUnary();
-    // Уровень 8: первичные выражения — литералы, вызовы, индексы, поля
+    std::expected<ExprPtr, Diagnostic> parsePostfixExpr();
     std::expected<ExprPtr, Diagnostic> parsePrimary();
 
     std::expected<ExprPtr, Diagnostic> parseIdentOrCall();
