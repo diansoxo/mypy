@@ -64,6 +64,33 @@ Diagnostic Parser::makeDiag(const std::string& msg) const {//объект оши
     };
 }
 
+//изм Записать ошибку в список и продолжить
+void Parser::emitDiag(const std::string& msg) {
+    diagnostics_.push_back(makeDiag(msg));
+}
+
+//изм Паника: пропускаем токены до ближайшего якоря
+void Parser::synchronize() {
+    while (!check(TokenType::EOF_TOKEN)) {
+        // якоря — места откуда можно безопасно продолжить
+        if (check(TokenType::NEWLINE)  ||
+            check(TokenType::SEMICOLON)||
+            check(TokenType::RBRACE)   ||
+            check(TokenType::FUNC)     ||
+            check(TokenType::STRUCT)   ||
+            check(TokenType::ENUM)     ||
+            check(TokenType::IMPL)     ||
+            check(TokenType::NAMESPACE)||
+            check(TokenType::TYPE))
+        {
+            if (check(TokenType::NEWLINE) || check(TokenType::SEMICOLON))
+                advance(); // берем сам разделитель
+            return;
+        }
+        advance();
+    }
+}
+
 // Разбор выражений
 // Цепочка вызовов снизу вверх по приоритету parseExpr -parseLogicalOr - parseLogicalAnd - parseComparison - parseSum - parseTerm - parseUnary - parsePrimary
 //макрос вызвать функцию и проверяет на ошибку сразу чтобы ее вернуть до компиляции
@@ -99,13 +126,13 @@ std::expected<ExprPtr, Diagnostic> Parser::parseLogicalOr() {// Уровень 2
 }
  
 std::expected<ExprPtr, Diagnostic> Parser::parseLogicalAnd() {// Уровень 3 and
-    auto left_res = parseComparison();
+    auto left_res = parseEquality();
     if (!left_res) return std::unexpected(left_res.error());
     auto left = std::move(*left_res);
  
     while (check(TokenType::AND)) {
         advance();
-        auto right_res = parseComparison();
+        auto right_res = parseEquality();
         if (!right_res) return std::unexpected(right_res.error());
         auto right = std::move(*right_res);
  
@@ -119,36 +146,55 @@ std::expected<ExprPtr, Diagnostic> Parser::parseLogicalAnd() {// Уровень 
     return left;
 }
 
-std::expected<ExprPtr, Diagnostic> Parser::parseComparison() {// Уровень 4 сравнения == != < > <= >=
-    auto left_res = parseSum();
+std::expected<ExprPtr, Diagnostic> Parser::parseEquality() {//уровень 4 только == != //изм
+    auto left_res = parseComparison(); // вызывает уровень ниже
     if (!left_res) return std::unexpected(left_res.error());
     auto left = std::move(*left_res);
- 
+
     std::string op;
-    if (check(TokenType::EQ))  op = "==";
+    if      (check(TokenType::EQ))  op = "==";
     else if (check(TokenType::NEQ)) op = "!=";
-    else if (check(TokenType::LT))  op = "<";
-    else if (check(TokenType::GT))  op = ">";
-    else if (check(TokenType::LTE)) op = "<=";
-    else if (check(TokenType::GTE)) op = ">=";
- 
+
     if (!op.empty()) {
         advance();
-        auto right_res = parseSum();
+        auto right_res = parseComparison();
         if (!right_res) return std::unexpected(right_res.error());
-        auto right = std::move(*right_res);
- 
         auto node = std::make_unique<BinaryOp>();
         node->pos = left->pos;
         node->op = op;
         node->left = std::move(left);
-        node->right = std::move(right);
+        node->right = std::move(right_res.value());
         return node;
     }
     return left;
 }
 
-std::expected<ExprPtr, Diagnostic> Parser::parseSum() {// Уровень 5 + -
+std::expected<ExprPtr, Diagnostic> Parser::parseComparison() {//уровень 5 >= <= < > //изм
+    auto left_res = parseSum(); // вызывает уровень ниже
+    if (!left_res) return std::unexpected(left_res.error());
+    auto left = std::move(*left_res);
+
+    std::string op;
+    if      (check(TokenType::LT))  op = "<";
+    else if (check(TokenType::GT))  op = ">";
+    else if (check(TokenType::LTE)) op = "<=";
+    else if (check(TokenType::GTE)) op = ">=";
+
+    if (!op.empty()) {
+        advance();
+        auto right_res = parseSum();
+        if (!right_res) return std::unexpected(right_res.error());
+        auto node = std::make_unique<BinaryOp>();
+        node->pos = left->pos;
+        node->op = op;
+        node->left = std::move(left);
+        node->right = std::move(right_res.value());
+        return node;
+    }
+    return left;
+}
+
+std::expected<ExprPtr, Diagnostic> Parser::parseSum() {// Уровень 6 + -
     auto left_res = parseTerm();
     if (!left_res) return std::unexpected(left_res.error());
     auto left = std::move(*left_res);
@@ -170,7 +216,7 @@ std::expected<ExprPtr, Diagnostic> Parser::parseSum() {// Уровень 5 + -
     return left;
 }
  
-std::expected<ExprPtr, Diagnostic> Parser::parseTerm() {// Уровень 6 * / %
+std::expected<ExprPtr, Diagnostic> Parser::parseTerm() {// Уровень 7 * / %
     auto left_res = parseUnary();
     if (!left_res) return std::unexpected(left_res.error());
     auto left = std::move(*left_res);
@@ -198,7 +244,7 @@ std::expected<ExprPtr, Diagnostic> Parser::parseTerm() {// Уровень 6 * / 
     return left;
 }
  
-std::expected<ExprPtr, Diagnostic> Parser::parseUnary() {// Уровень 7 унарные - и not
+std::expected<ExprPtr, Diagnostic> Parser::parseUnary() {// Уровень 8 унарные - и not
     if (check(TokenType::MINUS)) {
         auto pos = Position{current().line, current().col};
         advance();
@@ -221,57 +267,57 @@ std::expected<ExprPtr, Diagnostic> Parser::parseUnary() {// Уровень 7 у�
         node->operand = std::move(*operand_res);
         return node;
     }
-    return parsePrimary();
+    return parsePostfixExpr();//изм
 }
- 
-std::expected<ExprPtr, Diagnostic> Parser::parsePrimary() {// Уровень 8 первичные выражения
+
+std::expected<ExprPtr, Diagnostic> Parser::parsePrimary() {//изм
     auto pos = Position{current().line, current().col};
 
-    if (check(TokenType::INT_LITERAL)) {//если целый литерал
+    if (check(TokenType::INT_LITERAL)) {
         auto tok = advance();
         auto node = std::make_unique<IntLiteral>();
         node->pos = pos;
         node->value = std::stoll(tok.value);
         return node;
     }
-    if (check(TokenType::FLOAT_LITERAL)) {// если вещественный
+    if (check(TokenType::FLOAT_LITERAL)) {
         auto tok = advance();
         auto node = std::make_unique<FloatLiteral>();
         node->pos = pos;
         node->value = std::stod(tok.value);
         return node;
     }
-    if (check(TokenType::STRING_LITERAL)) {// строка
+    if (check(TokenType::STRING_LITERAL)) {
         auto tok = advance();
         auto node = std::make_unique<StringLiteral>();
         node->pos = pos;
         node->value = tok.value;
         return node;
     }
-    if (check(TokenType::BOOL_LITERAL)) {// булево: true/false
+    if (check(TokenType::BOOL_LITERAL)) {
         auto tok = advance();
         auto node = std::make_unique<BoolLiteral>();
         node->pos = pos;
         node->value = (tok.value == "true");
         return node;
     }
-    // идентификатор: x, f(), A.B, Point{..}
     if (check(TokenType::IDENTIFIER)) {
-        auto expr_res = parseIdentOrCall();
-        if (!expr_res) return std::unexpected(expr_res.error());
-        return parsePostfix(std::move(*expr_res));
+        return parseIdentOrCall();
     }
-    // массив: [1,2,3]
     if (check(TokenType::LBRACKET)) {
         return parseArrayLiteral();
     }
-    // скобки или кортеж: (expr) или (a,b)
     if (check(TokenType::LPAREN)) {
         return parseTupleOrParen();
     }
- 
     return std::unexpected(makeDiag(
         "ожидается выражение, получен: '" + current().value + "'"));
+}
+
+std::expected<ExprPtr, Diagnostic> Parser::parsePostfixExpr() {
+    auto expr_res = parsePrimary();
+    if (!expr_res) return std::unexpected(expr_res.error());
+    return parsePostfix(std::move(*expr_res));
 }
  
 // идентификатор, вызов, enum литерал, struct литерал
@@ -505,14 +551,17 @@ std::expected<std::unique_ptr<Block>, Diagnostic> Parser::parseBlock() {//тел
  
     skipNewlines();
 
-    while (!check(TokenType::RBRACE) &&//}
-           !check(TokenType::EOF_TOKEN))
-    {
-        auto stmt_res = parseStmt();
-        if (!stmt_res) return std::unexpected(stmt_res.error());
+// изм записать ошибку и продолжить со следующей инструкции
+while (!check(TokenType::RBRACE) && !check(TokenType::EOF_TOKEN)) {
+    auto stmt_res = parseStmt();
+    if (!stmt_res) {
+        diagnostics_.push_back(stmt_res.error()); // записываем
+        synchronize();//ищем следующую инструкцию
+    } else {
         block->stmts.push_back(std::move(*stmt_res));
-        skipNewlines();
     }
+    skipNewlines();
+}
 
     auto rb = expect(TokenType::RBRACE, "ожидается '}'");
     if (!rb) return std::unexpected(rb.error());
@@ -1100,20 +1149,22 @@ std::expected<std::unique_ptr<TypeAlias>, Diagnostic> Parser::parseTypeAlias() {
     return node;
 }
  
-// parse — главный метод: разбираем всю программу
-// Программа = список объявлений верхнего уровня до EOF
-std::expected<Program, Diagnostic> Parser::parse() {
+//изм parse -главный методгде разбираем всю программу
+// Программа -список объявлений верхнего уровня до EOF
+Parser::ParseResult Parser::parse() {
     Program program;
     skipNewlines();
- 
     while (!check(TokenType::EOF_TOKEN)) {
         auto decl_res = parseDecl();
-        if (!decl_res) return std::unexpected(decl_res.error());
-        program.decls.push_back(std::move(*decl_res));
+        if (!decl_res) {
+            diagnostics_.push_back(decl_res.error()); //записываем ошибку
+            synchronize();//ищем следующий якорь
+        } else {
+            program.decls.push_back(std::move(*decl_res));
+        }
         skipNewlines();
     }
- 
-    return program;
+    return ParseResult{ std::move(program), std::move(diagnostics_) };
 }
 
 }
