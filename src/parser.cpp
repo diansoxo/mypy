@@ -117,7 +117,7 @@ std::expected<ExprPtr, Diagnostic> Parser::parseLogicalOr() {// Уровень 2
  
         auto node = std::make_unique<BinaryOp>();
         node->pos = left->pos;
-        node->op = "or";
+        node->op = BinOp::Or;//изм
         node->left = std::move(left);
         node->right = std::move(right);
         left = std::move(node);
@@ -138,7 +138,7 @@ std::expected<ExprPtr, Diagnostic> Parser::parseLogicalAnd() {// Уровень 
  
         auto node = std::make_unique<BinaryOp>();
         node->pos = left->pos;
-        node->op = "and";
+        node->op = BinOp::And;//изм
         node->left = std::move(left);
         node->right = std::move(right);
         left = std::move(node);
@@ -151,17 +151,17 @@ std::expected<ExprPtr, Diagnostic> Parser::parseEquality() {//уровень 4 �
     if (!left_res) return std::unexpected(left_res.error());
     auto left = std::move(*left_res);
 
-    std::string op;
-    if      (check(TokenType::EQ))  op = "==";
-    else if (check(TokenType::NEQ)) op = "!=";
-
-    if (!op.empty()) {
+    BinOp op_enum;//изм строку можно было проверить на пустоту а enum нельзя нужен отдельный bool флаг
+    bool has_op = false;
+    if  (check(TokenType::EQ))  { op_enum = BinOp::Eq; has_op = true; }
+    else if (check(TokenType::NEQ)) { op_enum = BinOp::Ne; has_op = true;}
+    if (has_op) {
         advance();
         auto right_res = parseComparison();
         if (!right_res) return std::unexpected(right_res.error());
         auto node = std::make_unique<BinaryOp>();
         node->pos = left->pos;
-        node->op = op;
+        node->op = op_enum;
         node->left = std::move(left);
         node->right = std::move(right_res.value());
         return node;
@@ -174,19 +174,20 @@ std::expected<ExprPtr, Diagnostic> Parser::parseComparison() {//уровень 5
     if (!left_res) return std::unexpected(left_res.error());
     auto left = std::move(*left_res);
 
-    std::string op;
-    if      (check(TokenType::LT))  op = "<";
-    else if (check(TokenType::GT))  op = ">";
-    else if (check(TokenType::LTE)) op = "<=";
-    else if (check(TokenType::GTE)) op = ">=";
+    BinOp op_enum;
+    bool has_op = false;
+    if (check(TokenType::LT))  { op_enum = BinOp::Lt; has_op = true; }
+    else if (check(TokenType::GT))  { op_enum = BinOp::Gt; has_op = true; }
+    else if (check(TokenType::LTE)) { op_enum = BinOp::Le; has_op = true; }
+    else if (check(TokenType::GTE)) { op_enum = BinOp::Ge; has_op = true; }
 
-    if (!op.empty()) {
+    if (has_op) {
         advance();
         auto right_res = parseSum();
         if (!right_res) return std::unexpected(right_res.error());
         auto node = std::make_unique<BinaryOp>();
         node->pos = left->pos;
-        node->op = op;
+        node->op = op_enum;
         node->left = std::move(left);
         node->right = std::move(right_res.value());
         return node;
@@ -200,7 +201,7 @@ std::expected<ExprPtr, Diagnostic> Parser::parseSum() {// Уровень 6 + -
     auto left = std::move(*left_res);
  
     while (check(TokenType::PLUS) || check(TokenType::MINUS)) {
-        std::string op = check(TokenType::PLUS) ? "+" : "-";
+        BinOp op_enum = check(TokenType::PLUS) ? BinOp::Add : BinOp::Sub;
         advance();
         auto right_res = parseTerm();
         if (!right_res) return std::unexpected(right_res.error());
@@ -208,7 +209,7 @@ std::expected<ExprPtr, Diagnostic> Parser::parseSum() {// Уровень 6 + -
  
         auto node = std::make_unique<BinaryOp>();
         node->pos = left->pos;
-        node->op = op;
+        node->op = op_enum;
         node->left = std::move(left);
         node->right = std::move(right);
         left = std::move(node);
@@ -225,10 +226,10 @@ std::expected<ExprPtr, Diagnostic> Parser::parseTerm() {// Уровень 7 * / 
            check(TokenType::SLASH) ||
            check(TokenType::PERCENT))
     {
-        std::string op;
-        if      (check(TokenType::STAR)) op = "*";
-        else if (check(TokenType::SLASH)) op = "/";
-        else op = "%";
+        
+        if (check(TokenType::STAR)) op_enum = BinOp::Mul;
+        else if (check(TokenType::SLASH)) op_enum = BinOp::Div;
+        else op_enum = BinOp::Mod;
         advance();
         auto right_res = parseUnary();
         if (!right_res) return std::unexpected(right_res.error());
@@ -236,7 +237,7 @@ std::expected<ExprPtr, Diagnostic> Parser::parseTerm() {// Уровень 7 * / 
  
         auto node = std::make_unique<BinaryOp>();
         node->pos = left->pos;
-        node->op = op;
+        node->op = op_enum;
         node->left = std::move(left);
         node->right = std::move(right);
         left = std::move(node);
@@ -252,7 +253,7 @@ std::expected<ExprPtr, Diagnostic> Parser::parseUnary() {// Уровень 8 у�
         if (!operand_res) return std::unexpected(operand_res.error());
         auto node = std::make_unique<UnaryOp>();
         node->pos = pos;
-        node->op = "-";
+        node->op =UnOp::Neg;//изм
         node->operand = std::move(*operand_res);
         return node;
     }
@@ -263,7 +264,7 @@ std::expected<ExprPtr, Diagnostic> Parser::parseUnary() {// Уровень 8 у�
         if (!operand_res) return std::unexpected(operand_res.error());
         auto node = std::make_unique<UnaryOp>();
         node->pos = pos;
-        node->op = "not";
+        node->op = UnOp::Not;//изм
         node->operand = std::move(*operand_res);
         return node;
     }
@@ -330,8 +331,11 @@ std::expected<ExprPtr, Diagnostic> Parser::parseIdentOrCall() {
     if (check(TokenType::LPAREN)) {
         advance(); // съедаем "("
         auto node = std::make_unique<Call>();
-        node->pos = pos;
-        node->name = name;
+        node->pos = pos;//изм
+        auto callee_node = std::make_unique<Identifier>();
+        callee_node->pos = pos;
+        callee_node->name = name;//
+        node->callee = std::move(callee_node);
         if (!check(TokenType::RPAREN)) {
             while (true) {
                 auto arg_res = parseExpr();
@@ -399,9 +403,8 @@ std::expected<ExprPtr, Diagnostic> Parser::parsePostfix(ExprPtr expr) {// пос
             auto rb = expect(TokenType::RBRACKET, "ожидается ']'");
             if (!rb) return std::unexpected(rb.error());
             auto node = std::make_unique<ArrayAccess>();
-            node->pos = expr->pos;
-            if (auto* id = dynamic_cast<Identifier*>(expr.get()))
-                node->name = id->name;
+            node->pos = expr->pos;//изм
+            node->base = std::move(expr);
             node->index = std::move(*idx_res);
             expr = std::move(node);
             continue;
@@ -637,14 +640,9 @@ std::expected<StmtPtr, Diagnostic> Parser::parseVarDecl() {
 
     if (!check(TokenType::NEWLINE) && !check(TokenType::EOF_TOKEN))
         return std::unexpected(makeDiag("ожидается перенос строки после объявления переменной"));
- 
-    auto node = std::make_unique<VarDecl>();
-    node->pos = pos;
-    node->is_mut = is_mut;
-    node->name = name;
-    node->type_name = type_name;
-    node->init = std::move(*init_res);
-    return node;
+    
+    return std::make_unique<VarDecl>(//изм конструктор есть
+    pos, is_mut, name, type_name, std::move(*init_res));
 }
 
 std::expected<StmtPtr, Diagnostic> Parser::parseAssignOrExprStmt() {
@@ -661,10 +659,13 @@ std::expected<StmtPtr, Diagnostic> Parser::parseAssignOrExprStmt() {
  
         if (!check(TokenType::NEWLINE) && !check(TokenType::EOF_TOKEN))
             return std::unexpected(makeDiag("ожидается перенос строки после присваивания"));
- 
+
         auto node = std::make_unique<Assign>();
-        node->pos = pos;
-        node->name = name;
+        node->pos = pos;//изм
+        auto target_node = std::make_unique<Identifier>();
+        target_node->pos = pos;
+        target_node->name = name;
+        node->target = std::move(target_node);
         node->value = std::move(*val_res);
         return node;
     }
@@ -1109,7 +1110,7 @@ std::expected<std::unique_ptr<NamespaceDecl>, Diagnostic> Parser::parseNamespace
  
         auto func_res = parseFuncDef();
         if (!func_res) return std::unexpected(func_res.error());
-        node->funcs.push_back(std::move(*func_res));
+        node->decls.push_back(std::move(*func_res));
         skipNewlines();
     }
  
