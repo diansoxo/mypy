@@ -226,7 +226,7 @@ std::expected<ExprPtr, Diagnostic> Parser::parseTerm() {// Уровень 7 * / 
            check(TokenType::SLASH) ||
            check(TokenType::PERCENT))
     {
-        
+        BinOp op_enum;
         if (check(TokenType::STAR)) op_enum = BinOp::Mul;
         else if (check(TokenType::SLASH)) op_enum = BinOp::Div;
         else op_enum = BinOp::Mod;
