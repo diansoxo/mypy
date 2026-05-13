@@ -8,6 +8,42 @@ export module lexer;
 import tokens;  
 
 export namespace lexer {
+
+struct Diagnostic {
+    std::string filename;
+    int line, col;
+    std::string message;
+    std::string format() const {
+        return filename + ":" + std::to_string(line) + ":"
+            + std::to_string(col) + ": error: " + message;
+    }
+void print() const {
+    std::cerr << format() << "\n";
+}
+};
+
+class Lexer {
+public:
+    Lexer(const std::string& source, const std::string& filename = "<stdin>");
+    std::expected<std::vector<Token>, Diagnostic> tokenize();
+
+private:
+    std::string source_, filename_;
+    size_t pos_;
+    int line_, col_;
+
+    bool isAtEnd() const;
+    char current() const;
+    char peek(int offset = 1) const;   // дефолт ТОЛЬКО здесь
+    char advance();
+    Diagnostic makeDiag(const std::string& msg) const;
+    void skipWhitespaceAndComments();
+    std::expected<Token, Diagnostic> readNumber();
+    std::expected<Token, Diagnostic> readString();
+    Token readIdentOrKeyword();
+    std::expected<Token, Diagnostic> nextToken();
+};
+
 Lexer::Lexer(const std::string& source, const std::string& filename)
     : source_(source), filename_(filename), pos_(0), line_(1), col_(1)
 {}
