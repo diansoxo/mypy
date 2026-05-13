@@ -1,13 +1,11 @@
-#pragma once
-// Абстрактное синтаксическое дерево (AST)
-// Каждый узел — отдельный класс, наследуется от базового Expr или Stmt
-// Узлы хранят дочерние узлы через unique_ptr (владение памятью)
+module;
 
 #include <string>
 #include <vector>
 #include <memory>
+export module ast;
 
-namespace parser {
+export namespace parser {
 struct Position {// Каждый узел хранит позицию в исходном коде (для диагностики)
     int line;
     int col;
