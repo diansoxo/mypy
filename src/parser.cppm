@@ -1,10 +1,94 @@
-#include "parser.hpp"
-#include "lexer.hpp"
+module;
+#include <string>
+#include <vector>
+#include <memory>
+#include <expected>
+#include <iostream>
 #include <cassert>
 
-namespace parser {
+export module parser;
+import tokens;
+import ast;
+
+export namespace parser {
 using lexer::Token;
 using lexer::TokenType;
+struct Diagnostic {
+    std::string filename;
+    int line, col;
+    std::string message;
+    std::string format() const {
+        return filename + ":" + std::to_string(line) + ":" +
+               std::to_string(col) + ": error: " + message;
+    }
+    void print() const { std::cerr << format() << "\n"; }
+};
+
+class Parser {
+public:
+    Parser(std::vector<Token> tokens, const std::string& filename);
+    struct ParseResult {
+        Program program;
+        std::vector<Diagnostic> errors;
+        bool ok() const { return errors.empty(); }
+    };
+    ParseResult parse();
+
+private:
+    std::vector<Token> tokens_;
+    size_t pos_;
+    std::string filename_;
+    std::vector<Diagnostic> diagnostics_;
+
+    const Token& current() const;
+    const Token& peek(int offset = 1) const;
+    const Token& advance();
+    bool check(TokenType type) const;
+    bool match(TokenType type);
+    std::expected<Token, Diagnostic> expect(TokenType type, const std::string& msg);
+    void skipNewlines();
+    Diagnostic makeDiag(const std::string& msg) const;
+    void emitDiag(const std::string& msg);
+    void synchronize();
+
+    std::expected<DeclPtr, Diagnostic> parseDecl();
+    std::expected<std::unique_ptr<FuncDef>, Diagnostic> parseFuncDef();
+    std::expected<std::unique_ptr<StructDecl>, Diagnostic> parseStructDecl();
+    std::expected<std::unique_ptr<EnumDecl>, Diagnostic> parseEnumDecl();
+    std::expected<std::unique_ptr<ImplDecl>, Diagnostic> parseImplDecl();
+    std::expected<std::unique_ptr<NamespaceDecl>, Diagnostic> parseNamespaceDecl();
+    std::expected<std::unique_ptr<TypeAlias>, Diagnostic> parseTypeAlias();
+
+    std::expected<std::unique_ptr<Block>, Diagnostic> parseBlock();
+    std::expected<StmtPtr, Diagnostic> parseStmt();
+    std::expected<StmtPtr, Diagnostic> parseVarDecl();
+    std::expected<StmtPtr, Diagnostic> parseAssignOrExprStmt();
+    std::expected<StmtPtr, Diagnostic> parseReturn();
+    std::expected<StmtPtr, Diagnostic> parseIf();
+    std::expected<StmtPtr, Diagnostic> parseWhile();
+    std::expected<StmtPtr, Diagnostic> parseFor();
+    std::expected<StmtPtr, Diagnostic> parseMatch();
+
+    std::expected<ExprPtr, Diagnostic> parseExpr();
+    std::expected<ExprPtr, Diagnostic> parseLogicalOr();
+    std::expected<ExprPtr, Diagnostic> parseLogicalAnd();
+    std::expected<ExprPtr, Diagnostic> parseEquality();
+    std::expected<ExprPtr, Diagnostic> parseComparison();
+    std::expected<ExprPtr, Diagnostic> parseSum();
+    std::expected<ExprPtr, Diagnostic> parseTerm();
+    std::expected<ExprPtr, Diagnostic> parseUnary();
+    std::expected<ExprPtr, Diagnostic> parsePostfixExpr();
+    std::expected<ExprPtr, Diagnostic> parsePrimary();
+    std::expected<ExprPtr, Diagnostic> parseIdentOrCall();
+    std::expected<ExprPtr, Diagnostic> parsePostfix(ExprPtr expr);
+    std::expected<ExprPtr, Diagnostic> parseArrayLiteral();
+    std::expected<ExprPtr, Diagnostic> parseTupleOrParen();
+    std::expected<std::string, Diagnostic> parseType();
+};
+
+
+
+
 Parser::Parser(std::vector<Token> tokens, const std::string& filename)//конструктор для иницализации полей до хождения в цикл
     : tokens_(std::move(tokens)) // вектор токенов
     , pos_(0) // начинаем с первого
@@ -535,14 +619,8 @@ std::expected<std::string, Diagnostic> Parser::parseType() {
     }
     return std::unexpected(makeDiag("ожидается тип"));
 }
- 
-}
 
 // Разбор инструкций
-namespace parser {
-using lexer::Token;
-using lexer::TokenType;
-
 std::expected<std::unique_ptr<Block>, Diagnostic> Parser::parseBlock() {//тело функций
     auto pos = Position{current().line, current().col};
  
@@ -823,13 +901,8 @@ std::expected<StmtPtr, Diagnostic> Parser::parseMatch() {
  
     return node;
 }
- 
-}
 
 // Разбор объявлений верхнего уровня
-namespace parser {
-using lexer::Token;
-using lexer::TokenType;
 // parseDecl См на текущий токен и выбирает нужный метод
 std::expected<DeclPtr, Diagnostic> Parser::parseDecl() {
     using TT = TokenType;
@@ -1167,5 +1240,4 @@ Parser::ParseResult Parser::parse() {
     }
     return ParseResult{ std::move(program), std::move(diagnostics_) };
 }
-
 }
