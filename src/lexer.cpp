@@ -1,7 +1,13 @@
-#include "lexer.hpp"
+module;
+#include <string>
+#include <vector>
+#include <expected>
+#include <iostream>
 #include <cctype>
+export module lexer;
+import tokens;  
 
-namespace lexer {
+export namespace lexer {
 Lexer::Lexer(const std::string& source, const std::string& filename)
     : source_(source), filename_(filename), pos_(0), line_(1), col_(1)
 {}
