@@ -25,6 +25,8 @@ enum class TokenType {//типы токенов
     NEWLINE, EOF_TOKEN
 };
 
+std::string tokenTypeName(TokenType t);
+
 struct Token {
     TokenType type;
     std::string value; // лексема
