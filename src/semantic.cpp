@@ -52,3 +52,66 @@ AnalysisResult SemanticAnalyzer::analyze(const parser::Program& program) {
     // упаковываем все найденные ошибки в результат и возвращаем
     return AnalysisResult{ std::move(diagnostics_) };
 }
+
+void SemanticAnalyzer::collectDecl(const parser::Decl& decl) {
+
+    if (auto* fd = dynamic_cast<const parser::FuncDef*>(&decl)) {
+        // проверяем что функция с таким именем ещё не объявлена
+        if (functions_.count(fd->name)) {
+            error(fd->pos.line, fd->pos.col,
+                  "функция '" + fd->name + "' уже объявлена");
+            return;
+        }
+        // собираем сигнатуру- только типы параметров и тип возврата
+        FuncInfo info;
+        for (auto& p : fd->params)
+            info.param_types.push_back(p.type_name);
+        info.return_type = fd->return_type.empty() ? "void" : fd->return_type;
+        // записываем в глобальную таблицу функций
+        functions_[fd->name] = std::move(info);
+        return;
+    }
+
+    if (auto* sd = dynamic_cast<const parser::StructDecl*>(&decl)) {
+        if (structs_.count(sd->name)) {
+            error(sd->pos.line, sd->pos.col,
+                  "структура '" + sd->name + "' уже объявлена");
+            return;
+        }
+        StructInfo info;
+        for (auto& f : sd->fields)
+            info.fields[f.name] = f.type_name; // имя поля -тип поля
+        structs_[sd->name] = std::move(info);
+        return;
+    }
+
+    if (auto* ed = dynamic_cast<const parser::EnumDecl*>(&decl)) {
+        if (enums_.count(ed->name)) {
+            error(ed->pos.line, ed->pos.col,
+                  "перечисление '" + ed->name + "' уже объявлено");
+            return;
+        }
+        EnumInfo info;
+        for (auto& v : ed->variants)
+            info.variants.push_back(v.name);
+        enums_[ed->name] = std::move(info);
+        return;
+    }
+
+    if (auto* ta = dynamic_cast<const parser::TypeAlias*>(&decl)) {// просто запоминаем: "Meters" -"int32"
+        type_aliases_[ta->name] = ta->type_name;
+        return;
+    }
+    
+    if (auto* nd = dynamic_cast<const parser::NamespaceDecl*>(&decl)) {
+        for (auto& d : nd->decls)
+            collectDecl(*d); //рекурсивно собираем функции внутри
+        return;
+    }
+    
+    if (auto* id = dynamic_cast<const parser::ImplDecl*>(&decl)) {
+        for (auto& m : id->methods)
+            collectDecl(*m); // рекурсивно собираем методы внутри
+        return;
+    }
+}
