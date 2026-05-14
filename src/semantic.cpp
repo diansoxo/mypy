@@ -1,6 +1,7 @@
 #include "semantic.hpp"
 #include <algorithm>
 
+namespace semantic {
 SemanticAnalyzer::SemanticAnalyzer(const std::string& filename)
     : filename_(filename) //запоминаем имя файла
 {}
@@ -114,4 +115,5 @@ void SemanticAnalyzer::collectDecl(const parser::Decl& decl) {
             collectDecl(*m); // рекурсивно собираем методы внутри
         return;
     }
+}
 }
