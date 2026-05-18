@@ -160,5 +160,29 @@ bool SemanticAnalyzer::isIntegerType(const std::string& t) const {
     std::string r = resolveAlias(t);
     return r=="int8"||r=="int16"||r=="int32"||r=="int64" ||r=="uint8"||r=="uint16"||r=="uint32"||r=="uint64";//нужна для индексов массивов arr[3.14] ошибка, arr[3] надо
 }
+void SemanticAnalyzer::checkFuncDef(const parser::FuncDef& fd) {
+    // проверяем что типы параметров существуют
+    for (auto& p : fd.params)
+        if (!isKnownType(p.type_name))
+            error(fd.pos.line, fd.pos.col,
+                  "параметр '" + p.name + "': неизвестный тип '" + p.type_name + "'");
+    std::string ret = fd.return_type.empty() ? "void" : fd.return_type;// нормализуем return type: пустая строка = void
+    if (!isKnownType(ret))
+        error(fd.pos.line, fd.pos.col,
+              "неизвестный тип возврата '" + ret + "'");
+    // сохраняем предыдущий return type и ставим текущий
+    // checkReturn будет сравнивать с current_return_type_
+    std::string prev = current_return_type_;
+    current_return_type_ = ret;
+    pushScope();
+    // параметры — это переменные внутри функции, объявляем их до тела
+    for (auto& p : fd.params)
+        declareVar(p.name, VarInfo{ p.type_name, false, fd.pos.line, fd.pos.col });
+    if (fd.body)
+        checkBlock(*fd.body);
+    popScope();
+
+    current_return_type_ = prev; // восстанавливаем
+}
 
 }
