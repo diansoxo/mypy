@@ -416,7 +416,7 @@ void SemanticAnalyzer::checkWhile(const parser::While& node) {
         error(node.pos.line, node.pos.col, "условие while должно быть bool, получено '" + cond_type + "'");
  
     loop_depth_++;
-    checkBlock(node.body);
+    checkBlock(*node.body);
     loop_depth_--;
 }
 
@@ -428,7 +428,7 @@ void SemanticAnalyzer::checkFor(const parser::For& node) { // итерируем
     pushScope();
     std::string elem_type = "";
     declareVar(node.var_name, VarInfo{ elem_type, false, node.pos.line, node.pos.col });
-    checkBlock(node.body);
+    checkBlock(*node.body);
     popScope();
     loop_depth_--;
 }
