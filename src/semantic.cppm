@@ -405,7 +405,7 @@ void SemanticAnalyzer::checkIf(const parser::If& node) {
     if (!cond_type.empty() && resolveAlias(cond_type) != "bool")
         error(node.pos.line, node.pos.col, "условие if должно быть bool, получено '" + cond_type + "'");
 
-    checkBlock(node.then_block);
+    checkBlock(*node.then_block);
     if (node.else_block)
         checkBlock(*node.else_block);
 }
