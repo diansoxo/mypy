@@ -569,4 +569,43 @@ std::string SemanticAnalyzer::checkArrayLiteral(const parser::ArrayLiteral& node
     return first_type;
 }
 
+//встроенные функции
+    
+std::string SemanticAnalyzer::checkBuiltin(
+    const std::string& name,
+    const std::vector<parser::ExprPtr>& args)
+{
+    if (name == "print" || name == "println") {
+        for (auto& a : args) checkExpr(*a);
+        return "void";
+    }
+    if (name == "input") {
+        if (!args.empty())
+            error(0, 0, "'input' не принимает аргументов");
+        return "string";
+    }
+    if (name == "exit") {
+        if (args.size() != 1)
+            error(0, 0, "'exit' принимает ровно 1 аргумент");
+        else {
+            std::string t = checkExpr(*args[0]);
+            if (!isIntegerType(t))
+                error(0, 0, "'exit' ожидает целый тип, получено '" + t + "'");
+        }
+        return "void";
+    }
+    if (name == "panic") {
+        if (args.size() != 1)
+            error(0, 0, "'panic' принимает ровно 1 аргумент");
+        else {
+            std::string t = checkExpr(*args[0]);
+            if (resolveAlias(t) != "string")
+                error(0, 0, "'panic' ожидает string, получено '" + t + "'");
+        }
+        return "void";
+    }
+ 
+    return ""; //не встроенная то вернём пустую строку
+}
+
 }
