@@ -1,6 +1,7 @@
 #include <cassert>
 #include <iostream>
-#include "lexer.hpp"
+import lexer;
+import tokens;
 
 static std::vector<lexer::Token> tokenize(const std::string& src) {
     lexer::Lexer lex(src, "<test>");
