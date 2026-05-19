@@ -5,6 +5,7 @@ module;
 #include <algorithm>
 #include <unordered_set>
 export module semantic;
+import ast;
 import parser;
 export namespace semantic {
 using Diagnostic = parser::Diagnostic;
