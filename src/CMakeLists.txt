@@ -1,33 +1,40 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.28)
 project(LexerParserTests CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
-set(INC_DIR ${CMAKE_SOURCE_DIR}/../inc)
-
-
-set(COMMON_SOURCES
-    lexer.cpp
-    tokens.cpp
+add_executable(test_lexer test_lexer.cpp)
+target_sources(test_lexer
+    PUBLIC FILE_SET CXX_MODULES FILES
+    tokens.cppm
+    ast.cppm
+    lexer.cppm
 )
 
-add_executable(test_lexer
-    test_lexer.cpp
-    ${COMMON_SOURCES}
-)
-target_include_directories(test_lexer PRIVATE ${INC_DIR})
 
-
-add_executable(test_parser
-    test_parser.cpp
-    ${COMMON_SOURCES}
-    parser.cpp
+add_executable(test_parser test_parser.cpp)
+target_sources(test_parser
+    PUBLIC FILE_SET CXX_MODULES FILES
+        tokens.cppm
+        ast.cppm
+        lexer.cppm
+        parser.cppm
 )
-target_include_directories(test_parser PRIVATE ${INC_DIR})
 
 # enable_testing() позволяет запускать через ctest
 enable_testing()
 add_test(NAME LexerTests  COMMAND test_lexer)
 add_test(NAME ParserTests COMMAND test_parser)
+
+add_executable(test_semantic test_semantic.cpp)
+target_sources(test_semantic
+    PUBLIC FILE_SET CXX_MODULES FILES
+        tokens.cppm
+        ast.cppm
+        lexer.cppm
+        parser.cppm
+        semantic.cppm
+)
+add_test(NAME SemanticTests COMMAND test_semantic)
