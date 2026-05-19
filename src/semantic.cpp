@@ -164,12 +164,10 @@ void SemanticAnalyzer::checkFuncDef(const parser::FuncDef& fd) {
     // проверяем что типы параметров существуют
     for (auto& p : fd.params)
         if (!isKnownType(p.type_name))
-            error(fd.pos.line, fd.pos.col,
-                  "параметр '" + p.name + "': неизвестный тип '" + p.type_name + "'");
+            error(fd.pos.line, fd.pos.col, "параметр '" + p.name + "': неизвестный тип '" + p.type_name + "'");
     std::string ret = fd.return_type.empty() ? "void" : fd.return_type;// нормализуем return type: пустая строка = void
     if (!isKnownType(ret))
-        error(fd.pos.line, fd.pos.col,
-              "неизвестный тип возврата '" + ret + "'");
+        error(fd.pos.line, fd.pos.col, "неизвестный тип возврата '" + ret + "'");
     // сохраняем предыдущий return type и ставим текущий
     // checkReturn будет сравнивать с current_return_type_
     std::string prev = current_return_type_;
@@ -183,6 +181,392 @@ void SemanticAnalyzer::checkFuncDef(const parser::FuncDef& fd) {
     popScope();
 
     current_return_type_ = prev; // восстанавливаем
+}
+
+void SemanticAnalyzer::checkStructDecl(const parser::StructDecl& sd) {// проверяем что типы всех полей существуют
+    for (auto& f : sd.fields) {
+        if (!isKnownType(f.type_name))
+            error(sd.pos.line, sd.pos.col, "поле '" + f.name + "': неизвестный тип '" + f.type_name + "'");
+    }
+}
+
+void SemanticAnalyzer::checkEnumDecl(const parser::EnumDecl& ed) {// проверяем что варианты не повторяются
+    std::unordered_set<std::string> seen;
+    for (auto& v : ed.variants) {
+        if (seen.count(v.name))
+            error(ed.pos.line, ed.pos.col, "вариант '" + v.name + "' уже объявлен в перечислении '" + ed.name + "'");
+        seen.insert(v.name);
+    }
+}
+
+void SemanticAnalyzer::checkImplDecl(const parser::ImplDecl& id) {// проверяем что тип для которого пишем методы существует
+    if (!structs_.count(id.name))
+        error(id.pos.line, id.pos.col, "impl для неизвестной структуры '" + id.name + "'");
+    for (auto& m : id.methods)//проверяем каждый метод
+        checkDecl(*m);
+}
+void SemanticAnalyzer::checkNamespaceDecl(const parser::NamespaceDecl& nd) {
+    for (auto& d : nd.decls)
+        checkDecl(*d);
+}
+// Блок и инструкции
+
+void SemanticAnalyzer::checkBlock(const parser::Block& block) {
+    pushScope();
+    for (auto& s : block.stmts)
+        checkStmt(*s);
+    popScope();
+}
+void SemanticAnalyzer::checkStmt(const parser::Stmt& stmt) {// смотрим тип узла и вызываем нужную функцию
+    if (auto* vd = dynamic_cast<const parser::VarDecl*>(&stmt))
+        return checkVarDecl(*vd);
+    if (auto* as = dynamic_cast<const parser::Assign*>(&stmt))
+        return checkAssign(*as);
+    if (auto* ret = dynamic_cast<const parser::Return*>(&stmt))
+        return checkReturn(*ret);
+    if (auto* ifs = dynamic_cast<const parser::If*>(&stmt))
+        return checkIf(*ifs);
+    if (auto* wh = dynamic_cast<const parser::While*>(&stmt))
+        return checkWhile(*wh);
+    if (auto* fr = dynamic_cast<const parser::For*>(&stmt))
+        return checkFor(*fr);
+    if (auto* mt = dynamic_cast<const parser::Match*>(&stmt))
+        return checkMatch(*mt);
+    if (auto* blk = dynamic_cast<const parser::Block*>(&stmt))
+        return checkBlock(*blk);
+    if (auto* es = dynamic_cast<const parser::ExprStmt*>(&stmt)) {
+        checkExpr(*es->expr); // проверяем выражение тип не важен
+        return;
+    }
+    if (dynamic_cast<const parser::Break*>(&stmt)) {
+        if (loop_depth_ == 0)
+            error(stmt.pos.line, stmt.pos.col, "'break' вне цикла");
+        return;
+    }
+    if (dynamic_cast<const parser::Continue*>(&stmt)) {
+        if (loop_depth_ == 0)
+            error(stmt.pos.line, stmt.pos.col, "'continue' вне цикла");
+        return;
+    }
+}
+void SemanticAnalyzer::checkVarDecl(const parser::VarDecl& vd) {// проверяем начальное значение и узнаём его тип
+    std::string init_type = checkExpr(*vd.init);    
+    if (!vd.type_name.empty()) {// если тип явно указан то проверяем что он существует и совместим
+        if (!isKnownType(vd.type_name))
+            error(vd.pos.line, vd.pos.col, "неизвестный тип '" + vd.type_name + "'");
+        else if (!typesCompatible(vd.type_name, init_type))
+            error(vd.pos.line, vd.pos.col, "несовместимые типы: переменная '" + vd.name + "' имеет тип '" + vd.type_name + "', но присваивается '" + init_type + "'");
+    }
+    
+    std::string actual_type = vd.type_name.empty() ? init_type : vd.type_name;// объявляем переменную в текущей области видимости
+    if (!declareVar(vd.name, VarInfo{ actual_type, vd.is_mut, vd.pos.line, vd.pos.col }))// если имя уже занято в этом блоке — ошибка
+        error(vd.pos.line, vd.pos.col,
+              "переменная '" + vd.name + "' уже объявлена в этом блоке");
+}
+void SemanticAnalyzer::checkAssign(const parser::Assign& as) {
+    // левая часть должна быть идентификатором
+    auto* id = dynamic_cast<const parser::Identifier*>(as.target.get());
+    if (!id) {
+        error(as.pos.line, as.pos.col, "левая часть присваивания должна быть переменной");
+        return;
+    }
+ 
+    // переменная должна существовать
+    const VarInfo* info = lookupVar(id->name);
+    if (!info) {
+        error(as.pos.line, as.pos.col, "переменная '" + id->name + "' не объявлена");
+        return;
+    }
+ 
+    // переменная должна быть изменяемой (mut)
+    if (!info->is_mut)
+        error(as.pos.line, as.pos.col,"переменная '" + id->name + "' неизменяемая: объявите через 'let mut'");
+ 
+    // тип правой части должен совпадать с типом переменной
+    std::string val_type = checkExpr(*as.value);
+    if (!typesCompatible(info->type_name, val_type))
+        error(as.pos.line, as.pos.col, "несовместимые типы при присваивании '" + id->name + "': ожидается '" + info->type_name + "', получено '" + val_type + "'");
+}
+void SemanticAnalyzer::checkReturn(const parser::Return& ret) {
+    if (ret.value) {
+        std::string val_type = checkExpr(*ret.value);// return с выражением
+        if (!typesCompatible(current_return_type_, val_type))
+            error(ret.pos.line, ret.pos.col, "неверный тип возврата: ожидается '" + current_return_type_ + "', получено '" + val_type + "'");
+    } else {   
+        if (current_return_type_ != "void")// return без значения функция возвр void
+            error(ret.pos.line, ret.pos.col, "функция должна вернуть значение типа '" + current_return_type_ + "'");
+    }
+}
+void SemanticAnalyzer::checkIf(const parser::If& node) {
+    std::string cond_type = checkExpr(*node.condition);
+    if (!cond_type.empty() && resolveAlias(cond_type) != "bool")
+        error(node.pos.line, node.pos.col, "условие if должно быть bool, получено '" + cond_type + "'");
+
+    checkBlock(node.then_block);
+    if (node.else_block)
+        checkBlock(*node.else_block);
+}
+ 
+void SemanticAnalyzer::checkWhile(const parser::While& node) {
+    std::string cond_type = checkExpr(*node.condition);
+    if (!cond_type.empty() && resolveAlias(cond_type) != "bool")
+        error(node.pos.line, node.pos.col, "условие while должно быть bool, получено '" + cond_type + "'");
+ 
+    loop_depth_++;
+    checkBlock(node.body);
+    loop_depth_--;
+}
+
+void SemanticAnalyzer::checkFor(const parser::For& node) { // итерируемое имя должно быть объявлено
+    const VarInfo* iter = lookupVar(node.iter_name);
+    if (!iter)
+        error(node.pos.line, node.pos.col, "переменная '" + node.iter_name + "' не объявлена");
+    loop_depth_++;
+    pushScope();
+    std::string elem_type = "";
+    declareVar(node.var_name, VarInfo{ elem_type, false, node.pos.line, node.pos.col });
+    checkBlock(node.body);
+    popScope();
+    loop_depth_--;
+}
+
+ 
+void SemanticAnalyzer::checkMatch(const parser::Match& node) {
+    std::string expr_type = checkExpr(*node.expr);
+ 
+    for (auto& arm : node.arms) {
+        if (!arm.is_wildcard && arm.pattern) {
+            std::string pat_type = checkExpr(*arm.pattern);
+            // образец должен быть совместим с выражением
+            if (!typesCompatible(expr_type, pat_type))
+                error(node.pos.line, node.pos.col, "образец типа '" + pat_type + "' несовместим с выражением типа '" + expr_type + "'");
+        }
+        checkStmt(*arm.body);
+    }
+
+
+// Выражения 
+    std::string SemanticAnalyzer::checkExpr(const parser::Expr& expr) {
+    if (auto* n = dynamic_cast<const parser::IntLiteral*>(&expr))
+        return "int32";
+    if (auto* n = dynamic_cast<const parser::FloatLiteral*>(&expr))
+        return "float64";
+    if (auto* n = dynamic_cast<const parser::StringLiteral*>(&expr))
+        return "string";
+    if (auto* n = dynamic_cast<const parser::BoolLiteral*>(&expr))
+        return "bool";
+ 
+    if (auto* n = dynamic_cast<const parser::Identifier*>(&expr)) {
+        const VarInfo* info = lookupVar(n->name);
+        if (!info) {
+            error(n->pos.line, n->pos.col, "переменная '" + n->name + "' не объявлена");
+            return "";
+        }
+        return info->type_name;
+    }
+ 
+    if (auto* n = dynamic_cast<const parser::BinaryOp*>(&expr))
+        return checkBinaryOp(*n);
+    if (auto* n = dynamic_cast<const parser::UnaryOp*>(&expr))
+        return checkUnaryOp(*n);
+    if (auto* n = dynamic_cast<const parser::Call*>(&expr))
+        return checkCall(*n);
+    if (auto* n = dynamic_cast<const parser::ArrayAccess*>(&expr))
+        return checkArrayAccess(*n);
+    if (auto* n = dynamic_cast<const parser::FieldAccess*>(&expr))
+        return checkFieldAccess(*n);
+    if (auto* n = dynamic_cast<const parser::Cast*>(&expr))
+        return checkCast(*n);
+    if (auto* n = dynamic_cast<const parser::StructLiteral*>(&expr))
+        return checkStructLiteral(*n);
+    if (auto* n = dynamic_cast<const parser::ArrayLiteral*>(&expr))
+        return checkArrayLiteral(*n);
+ 
+    if (auto* n = dynamic_cast<const parser::EnumLiteral*>(&expr)) {
+        auto it = enums_.find(n->enum_name);// проверяем что enum существует и вариант в нём есть
+        if (it == enums_.end()) {
+            error(n->pos.line, n->pos.col, "неизвестное перечисление '" + n->enum_name + "'");
+            return "";
+        }
+        auto& variants = it->second.variants;
+        bool found = std::find(variants.begin(), variants.end(), n->variant_name) != variants.end();
+        if (!found)
+            error(n->pos.line, n->pos.col, "вариант '" + n->variant_name + "' не найден в перечислении '" + n->enum_name + "'");
+        return n->enum_name;
+    }
+ 
+    // TupleLiteral просто проверяем элементы, тип не выводим
+    if (auto* n = dynamic_cast<const parser::TupleLiteral*>(&expr)) {
+        for (auto& el : n->elements)
+            checkExpr(*el);
+        return "tuple";
+    }
+ 
+    return "";
+}
+
+    std::string SemanticAnalyzer::checkBinaryOp(const parser::BinaryOp& node) {
+    std::string lt = checkExpr(*node.left);
+    std::string rt = checkExpr(*node.right);
+ 
+    using B = parser::BinOp;
+ 
+    switch (node.op) {
+        case B::Add: case B::Sub: case B::Mul:// арифметика
+        case B::Div: case B::Mod:
+            if (!lt.empty() && !isNumericType(lt))
+                error(node.pos.line, node.pos.col, "арифметическая операция требует числового типа, получено '" + lt + "'");
+            if (!rt.empty() && !isNumericType(rt))
+                error(node.pos.line, node.pos.col, "арифметическая операция требует числового типа, получено '" + rt + "'");
+            if (!typesCompatible(lt, rt))
+                error(node.pos.line, node.pos.col, "несовместимые типы в операции: '" + lt + "' и '" + rt + "'");
+            return lt;
+ 
+        case B::Eq: case B::Ne:// сравнение
+        case B::Lt: case B::Gt:
+        case B::Le: case B::Ge:
+            if (!typesCompatible(lt, rt))
+                error(node.pos.line, node.pos.col, "нельзя сравнивать '" + lt + "' и '" + rt + "'");
+            return "bool";
+ 
+        
+        case B::And: case B::Or:// логика
+            if (!lt.empty() && resolveAlias(lt) != "bool")
+                error(node.pos.line, node.pos.col, "логическая операция требует bool, получено '" + lt + "'");
+            if (!rt.empty() && resolveAlias(rt) != "bool")
+                error(node.pos.line, node.pos.col, "логическая операция требует bool, получено '" + rt + "'");
+            return "bool";
+    }
+    return "";
+}
+ 
+std::string SemanticAnalyzer::checkUnaryOp(const parser::UnaryOp& node) {
+    std::string t = checkExpr(*node.operand);
+ 
+    if (node.op == parser::UnOp::Neg) {// унарный минус только числа
+        
+        if (!t.empty() && !isNumericType(t))
+            error(node.pos.line, node.pos.col, "унарный минус требует числового типа, получено '" + t + "'");
+        return t;
+    }// логическое отрицание только bool
+    if (node.op == parser::UnOp::Not) {
+        
+        if (!t.empty() && resolveAlias(t) != "bool")
+            error(node.pos.line, node.pos.col, "'not' требует bool, получено '" + t + "'");
+        return "bool";
+    }
+    return t;
+}
+ 
+std::string SemanticAnalyzer::checkCall(const parser::Call& node) {
+    auto* callee_id = dynamic_cast<const parser::Identifier*>(node.callee.get());
+    if (!callee_id) {
+        error(node.pos.line, node.pos.col, "вызов только по имени функции");
+        return "";
+    }
+    const std::string& name = callee_id->name;
+    
+    std::string builtin = checkBuiltin(name, node.args);
+    if (!builtin.empty()) return builtin;
+ 
+    auto it = functions_.find(name);
+    if (it == functions_.end()) {
+        error(node.pos.line, node.pos.col,
+              "функция '" + name + "' не объявлена");
+        // всё равно проверяем аргументы чтобы не пропустить ошибки внутри
+        for (auto& a : node.args) checkExpr(*a);
+        return "";
+    }
+ 
+    auto& info = it->second;
+ 
+    // количество аргументов
+    if (node.args.size() != info.param_types.size())
+        error(node.pos.line, node.pos.col,"функция '" + name + "' ожидает " + std::to_string(info.param_types.size()) + " аргументов, передано " + std::to_string(node.args.size()));
+ 
+    // типы аргументов
+    for (size_t i = 0; i < node.args.size(); ++i) {
+        std::string at = checkExpr(*node.args[i]);
+        if (i < info.param_types.size() && !typesCompatible(info.param_types[i], at))
+            error(node.pos.line, node.pos.col, "аргумент " + std::to_string(i + 1) + " функции '" + name + "': ожидается '" + info.param_types[i] + "', получено '" + at + "'");
+    }
+ 
+    return info.return_type;
+}
+ 
+std::string SemanticAnalyzer::checkArrayAccess(const parser::ArrayAccess& node) {
+    checkExpr(*node.base);
+    std::string idx_type = checkExpr(*node.index);
+    if (!idx_type.empty() && !isIntegerType(idx_type))
+        error(node.pos.line, node.pos.col, "индекс массива должен быть целым числом, получено '" + idx_type + "'");
+ 
+    return "";
+}
+ 
+std::string SemanticAnalyzer::checkFieldAccess(const parser::FieldAccess& node) {
+    std::string obj_type = checkExpr(*node.object);
+    if (obj_type.empty()) return "";
+ 
+    std::string resolved = resolveAlias(obj_type);
+    auto it = structs_.find(resolved);
+    if (it == structs_.end()) {
+        error(node.pos.line, node.pos.col, "тип '" + obj_type + "' не является структурой");
+        return "";
+    }
+ 
+    auto& fields = it->second.fields;
+    auto fit = fields.find(node.field);
+    if (fit == fields.end()) {
+        error(node.pos.line, node.pos.col, "поле '" + node.field + "' не найдено в структуре '" + obj_type + "'");
+        return "";
+    }
+    return fit->second;
+}
+ 
+std::string SemanticAnalyzer::checkCast(const parser::Cast& node) {
+    checkExpr(*node.expr);
+    if (!isKnownType(node.type))
+        error(node.pos.line, node.pos.col,"приведение к неизвестному типу '" + node.type + "'");
+    return node.type;
+}
+ 
+std::string SemanticAnalyzer::checkStructLiteral(const parser::StructLiteral& node) {
+    auto it = structs_.find(node.name);
+    if (it == structs_.end()) {
+        error(node.pos.line, node.pos.col, "неизвестная структура '" + node.name + "'");
+        for (auto& f : node.fields) checkExpr(*f.value);
+        return "";
+    }
+ 
+    auto& expected_fields = it->second.fields;
+ 
+    // проверяем что все переданные поля существуют и имеют правильный тип
+    for (auto& fi : node.fields) {
+        auto fit = expected_fields.find(fi.name);
+        if (fit == expected_fields.end()) {
+            error(node.pos.line, node.pos.col, "поле '" + fi.name + "' не существует в структуре '" + node.name + "'");
+            checkExpr(*fi.value);
+            continue;
+        }
+        std::string val_type = checkExpr(*fi.value);
+        if (!typesCompatible(fit->second, val_type))
+            error(node.pos.line, node.pos.col,"поле '" + fi.name + "': ожидается '" + fit->second + "', получено '" + val_type + "'");
+    }
+ 
+    return node.name;
+}
+ 
+std::string SemanticAnalyzer::checkArrayLiteral(const parser::ArrayLiteral& node) {
+    if (node.elements.empty()) return "";
+ 
+    std::string first_type = checkExpr(*node.elements[0]);
+    for (size_t i = 1; i < node.elements.size(); ++i) {
+        std::string t = checkExpr(*node.elements[i]);
+        if (!typesCompatible(first_type, t))
+            error(node.pos.line, node.pos.col, "все элементы массива должны быть одного типа: ожидается '" +
+                  first_type + "', получено '" + t + "'");
+    }
+    return first_type;
 }
 
 }
