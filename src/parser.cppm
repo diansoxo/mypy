@@ -1229,10 +1229,13 @@ Parser::ParseResult Parser::parse() {
     Program program;
     skipNewlines();
     while (!check(TokenType::EOF_TOKEN)) {
+        size_t pos_before = pos_;
         auto decl_res = parseDecl();
         if (!decl_res) {
             diagnostics_.push_back(decl_res.error()); //записываем ошибку
             synchronize();//ищем следующий якорь
+            if (pos_ == pos_before)  // если не продвинулись — принудительно шагаем
+            advance();
         } else {
             program.decls.push_back(std::move(*decl_res));
         }
