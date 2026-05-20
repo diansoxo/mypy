@@ -1,8 +1,8 @@
 #include <cassert>
 #include <iostream>
-#include "lexer.hpp"
-#include "parser.hpp"
-#include "ast.hpp"
+import lexer;
+import parser;
+import ast;
 
 static parser::Parser::ParseResult parse(const std::string& src) {
     lexer::Lexer lex(src, "<test>");
