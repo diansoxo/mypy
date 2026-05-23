@@ -46,6 +46,9 @@ void test_assign_mutable() {
 // Тест 5: условие if должно быть bool
 void test_if_condition_bool() {
     auto r = analyze("func main() {\nlet x: int32 = 1\nif x {\n}\n}\n");
+    std::cerr << "errors: " << r.errors.size() << "\n";
+    for (auto& e : r.errors)
+        std::cerr << "  " << e.format() << "\n";
     assert(!r.ok());
     std::cout << "[SEMANTIC] test_if_condition_bool PASSED\n";
 }
