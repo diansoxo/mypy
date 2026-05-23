@@ -39,6 +39,7 @@ private:
     size_t pos_;
     std::string filename_;
     std::vector<Diagnostic> diagnostics_;
+    bool in_condition_ = false;//изм
 
     const Token& current() const;
     const Token& peek(int offset = 1) const;
@@ -447,7 +448,7 @@ std::expected<ExprPtr, Diagnostic> Parser::parseIdentOrCall() {
         return node;
     }
  
-    if (check(TokenType::LBRACE)) {// struct литерал: Name { field = expr }
+    if (check(TokenType::LBRACE)&& !in_condition_) {// struct литерал: Name { field = expr } изм
         advance(); // съедаем "{"
         auto node = std::make_unique<StructLiteral>();
         node->pos = pos;
@@ -778,8 +779,10 @@ std::expected<StmtPtr, Diagnostic> Parser::parseReturn() {
 std::expected<StmtPtr, Diagnostic> Parser::parseIf() {
     auto pos = Position{current().line, current().col};
     advance();
- 
+
+    in_condition_ = true;//изм
     auto cond_res = parseExpr();//условие выражение
+    in_condition_ = false;//изм
     if (!cond_res) return std::unexpected(cond_res.error());
  
     skipNewlines(); //перенос строки перед { допускается
@@ -808,7 +811,9 @@ std::expected<StmtPtr, Diagnostic> Parser::parseWhile() {
     advance(); // съедаем "while"
  
     // условие
+    in_condition_ = true;
     auto cond_res = parseExpr();
+    in_condition_ = false;
     if (!cond_res) return std::unexpected(cond_res.error());
  
     skipNewlines();
