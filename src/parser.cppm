@@ -380,6 +380,14 @@ std::expected<ExprPtr, Diagnostic> Parser::parsePrimary() {//изм
         node->value = tok.value;
         return node;
     }
+    if (check(TokenType::CHAR_LITERAL)) {
+        auto tok = advance();
+        auto node = std::make_unique<CharLiteral>();
+        node->pos = pos;
+        node->value = tok.value[0];
+        return node;
+    }
+
     if (check(TokenType::BOOL_LITERAL)) {
         auto tok = advance();
         auto node = std::make_unique<BoolLiteral>();
@@ -606,7 +614,7 @@ std::expected<std::string, Diagnostic> Parser::parseType() {
     if (check(TT::INT8)  || check(TT::INT16)  || check(TT::INT32)  || check(TT::INT64)  ||
         check(TT::UINT8) || check(TT::UINT16) || check(TT::UINT32) || check(TT::UINT64) ||
         check(TT::FLOAT32) || check(TT::FLOAT64) ||
-        check(TT::BOOL_TYPE) || check(TT::STRING_TYPE) || check(TT::VOID))
+        check(TT::BOOL_TYPE) || check(TT::CHAR_TYPE) || check(TT::STRING_TYPE) || check(TT::VOID))
     {
         std::string name = current().value;
         advance();
