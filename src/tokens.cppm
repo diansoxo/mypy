@@ -7,7 +7,7 @@ export module tokens;
 export namespace lexer {
 enum class TokenType {//типы токенов
     INT_LITERAL, FLOAT_LITERAL, STRING_LITERAL, BOOL_LITERAL,
-    IDENTIFIER,
+    IDENTIFIER, CHAR_LITERAL,
     FUNC, LET, MUT, RETURN,
     IF, ELSE, WHILE, FOR, IN, BREAK, CONTINUE, PASS,
     AND, OR, NOT,
@@ -16,7 +16,7 @@ enum class TokenType {//типы токенов
     INT8, INT16, INT32, INT64,
     UINT8, UINT16, UINT32, UINT64,
     FLOAT32, FLOAT64,
-    BOOL_TYPE, STRING_TYPE, VOID,
+    BOOL_TYPE, STRING_TYPE, CHAR_TYPE, VOID,
     PLUS, MINUS, STAR, SLASH, PERCENT,
     EQ, NEQ, LT, GT, LTE, GTE,
     ASSIGN, ARROW, DOTDOT,
@@ -82,6 +82,7 @@ static const std::unordered_map<std::string, TokenType> KEYWORDS = { //слов�
     {"float32", TokenType::FLOAT32},
     {"float64", TokenType::FLOAT64},
     {"bool", TokenType::BOOL_TYPE},
+    {"char", TokenType::CHAR_TYPE},
     {"string", TokenType::STRING_TYPE},
     {"void", TokenType::VOID},
 };
