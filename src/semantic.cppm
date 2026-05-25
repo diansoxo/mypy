@@ -458,6 +458,8 @@ std::string SemanticAnalyzer::checkExpr(const parser::Expr& expr) {
         return "string";
     if (auto* n = dynamic_cast<const parser::BoolLiteral*>(&expr))
         return "bool";
+    if (auto* n = dynamic_cast<const parser::CharLiteral*>(&expr))  // ← добавить
+        return "char";
  
     if (auto* n = dynamic_cast<const parser::Identifier*>(&expr)) {
         const VarInfo* info = lookupVar(n->name);
@@ -707,8 +709,18 @@ std::string SemanticAnalyzer::checkBuiltin(
         }
         return "void";
     }
- 
-    return ""; //не встроенная то вернём пустую строку
+    if (name == "assert") {
+        if (args.size() != 1)
+            error(0, 0, "'assert' принимает ровно 1 аргумент");
+        else {
+            std::string t = checkExpr(*args[0]);
+            if (resolveAlias(t) != "bool")
+                error(0, 0, "'assert' ожидает bool, получено '" + t + "'");
+        }
+        return "void";
+    }
+
+    return ""; // не встроенная
 }
 
 }
