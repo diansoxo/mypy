@@ -39,6 +39,7 @@ private:
     Diagnostic makeDiag(const std::string& msg) const;
     void skipWhitespaceAndComments();
     std::expected<Token, Diagnostic> readNumber();
+    std::expected<Token, Diagnostic> readChar();
     std::expected<Token, Diagnostic> readString();
     Token readIdentOrKeyword();
     std::expected<Token, Diagnostic> nextToken();
@@ -114,6 +115,51 @@ std::expected<Token, Diagnostic> Lexer::readNumber() {//число или оши
     return Token{t, buf, startLine, startCol};
 }
 
+std::expected<Token, Diagnostic> Lexer::readChar() {//изм 
+    int startLine = line_;
+    int startCol  = col_;
+    advance();
+
+    if (isAtEnd())
+        return std::unexpected(makeDiag("незакрытый символьный литерал"));
+
+    char value;
+    char ch = current();
+
+    if (ch == '\\') {
+        advance();
+        if (isAtEnd())
+            return std::unexpected(makeDiag("незавершённая escape-последовательность"));
+        char esc = current();
+        switch (esc) {
+            case 'n':  value = '\n'; break;
+            case 't':  value = '\t'; break;
+            case '\'': value = '\''; break;
+            case '\\': value = '\\'; break;
+            case '0':  value = '\0'; break;
+            default: {
+                std::string msg = "неизвестная escape-последовательность: \\";
+                msg += esc;
+                return std::unexpected(makeDiag(msg));
+            }
+        }
+        advance();
+    } else if (ch == '\'') {
+        return std::unexpected(makeDiag("пустой символьный литерал"));
+    } else if (ch == '\n') {
+        return std::unexpected(makeDiag("символьный литерал не может содержать перевод строки"));
+    } else {
+        value = ch;
+        advance();
+    }
+    if (current() != '\'')
+        return std::unexpected(makeDiag("ожидается закрывающая ' после символа"));
+    advance();
+
+    std::string buf(1, value);
+    return Token{TokenType::CHAR_LITERAL, buf, startLine, startCol};
+}
+
 std::expected<Token, Diagnostic> Lexer::readString() {//читаем строку
     int startLine = line_;
     int startCol= col_;
@@ -187,6 +233,9 @@ std::expected<Token, Diagnostic> Lexer::nextToken() {
 
     if (ch == '\t')//таб запрещены
         return std::unexpected(makeDiag("табуляция запрещена: используйте пробелы для отступов"));
+
+    if (ch == '\'')
+        return readChar();
 
     if (ch == '"')
         return readString();
