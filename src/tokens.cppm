@@ -136,6 +136,8 @@ std::string tokenTypeName(TokenType t) {//принимает тип и возв�
         case TokenType::FLOAT64: return "FLOAT64";
         case TokenType::BOOL_TYPE: return "BOOL_TYPE";
         case TokenType::STRING_TYPE: return "STRING_TYPE";
+        case TokenType::CHAR_LITERAL: return "CHAR_LITERAL";
+        case TokenType::CHAR_TYPE: return "CHAR_TYPE";
         case TokenType::VOID: return "VOID";
         case TokenType::PLUS:return "PLUS";
         case TokenType::MINUS: return "MINUS";
