@@ -61,6 +61,10 @@ struct BoolLiteral : Expr {
     bool value;
 };
 
+struct CharLiteral : Expr {
+    char value;
+};
+
 struct Identifier : Expr {
     std::string name;
 };
