@@ -122,4 +122,43 @@ private:
                       int line);
 };
 
+// 1)области видимости
+Interpreter::Interpreter(const parser::Program& program)
+    : program_(program)
+{}
+
+void Interpreter::pushScope() {
+    scopes_.emplace_back(); // новый пустой словарь сверху
+}
+
+void Interpreter::popScope() {
+    if (!scopes_.empty())
+        scopes_.pop_back();
+}
+
+void Interpreter::declareVar(const std::string& name, Value val) {
+    scopes_.back()[name] = std::move(val);
+}
+
+void Interpreter::setVar(const std::string& name, Value val, int line) {
+    for (int i = static_cast<int>(scopes_.size()) - 1; i >= 0; --i) {
+        auto it = scopes_[i].find(name);
+        if (it != scopes_[i].end()) {
+            it->second = std::move(val);
+            return;
+        }
+    }
+    runtimeError("переменная '" + name + "' не найдена", line);
+}
+
+Value& Interpreter::getVar(const std::string& name, int line) {
+    for (int i = static_cast<int>(scopes_.size()) - 1; i >= 0; --i) {
+        auto it = scopes_[i].find(name);
+        if (it != scopes_[i].end())
+            return it->second;
+    }
+    runtimeError("переменная '" + name + "' не найдена", line);
+}
+
+
 }
