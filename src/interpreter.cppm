@@ -180,4 +180,39 @@ int Interpreter::run() {
     return 0;
 }
 
+//3 evalExpr
+Value Interpreter::evalExpr(const parser::Expr& expr) {
+
+    if (auto* n = dynamic_cast<const parser::IntLiteral*>(&expr))// литералы — просто возвращаем значение
+        return Value(static_cast<int64_t>(n->value));
+
+    if (auto* n = dynamic_cast<const parser::FloatLiteral*>(&expr))
+        return Value(n->value);
+
+    if (auto* n = dynamic_cast<const parser::BoolLiteral*>(&expr))
+        return Value(n->value);
+
+    if (auto* n = dynamic_cast<const parser::CharLiteral*>(&expr))
+        return Value(n->value);
+
+    if (auto* n = dynamic_cast<const parser::StringLiteral*>(&expr))
+        return Value(n->value);
+
+    if (auto* n = dynamic_cast<const parser::Identifier*>(&expr))// переменная — ищем в scopes_
+        return getVar(n->name, n->pos.line);
+
+    if (auto* n = dynamic_cast<const parser::ArrayLiteral*>(&expr)) {// массив
+        Value::Array arr;
+        for (auto& el : n->elements)
+            arr.push_back(evalExpr(*el));
+        return Value(std::move(arr));
+    }
+
+    if (auto* n = dynamic_cast<const parser::StructLiteral*>(&expr)) {// структура
+        Value::Struct s;
+        for (auto& f : n->fields)
+            s[f.name] = evalExpr(*f.value);
+        return Value(std::move(s));
+    }
+
 }
