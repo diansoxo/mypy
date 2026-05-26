@@ -160,5 +160,24 @@ Value& Interpreter::getVar(const std::string& name, int line) {
     runtimeError("переменная '" + name + "' не найдена", line);
 }
 
+// 2) конструктор и run
+
+int Interpreter::run() {
+    for (auto& d : program_.decls) {
+        if (auto* fd = dynamic_cast<const parser::FuncDef*>(d.get()))
+            functions_[fd->name] = fd;
+    }
+    auto it = functions_.find("main");
+    if (it == functions_.end()) {
+        std::cerr << "runtime error: функция 'main' не найдена\n";
+        return 1;
+    }
+
+    Value result = callFunc(*it->second, {}, 0);
+
+    if (result.isInt())
+        return static_cast<int>(result.asInt());
+    return 0;
+}
 
 }
