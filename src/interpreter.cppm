@@ -229,4 +229,47 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
         return arr[i];
     }
 
+    if (auto* n = dynamic_cast<const parser::FieldAccess*>(&expr)) {//// доступ к полю
+        Value obj = evalExpr(*n->object);
+        if (!obj.isStruct())
+            runtimeError("доступ к полю не-структуры", n->pos.line);
+        auto& s = obj.asStruct();
+        auto it = s.find(n->field);
+        if (it == s.end())
+            runtimeError("поле '" + n->field + "' не найдено", n->pos.line);
+        return it->second;
+    }
+
+    if (auto* n = dynamic_cast<const parser::Cast*>(&expr)) {//приведение типов
+        Value v = evalExpr(*n->expr);
+        const std::string& t = n->type;
+        // int → float
+        if ((t=="float32"||t=="float64") && v.isInt())
+            return Value(static_cast<double>(v.asInt()));
+        // float → int
+        if ((t=="int8"||t=="int16"||t=="int32"||t=="int64"||
+             t=="uint8"||t=="uint16"||t=="uint32"||t=="uint64") && v.isFloat())
+            return Value(static_cast<int64_t>(v.asFloat()));
+        // char → int
+        if ((t=="int8"||t=="int16"||t=="int32"||t=="int64") && v.isChar())
+            return Value(static_cast<int64_t>(v.asChar()));
+        // int → char
+        if (t=="char" && v.isInt())
+            return Value(static_cast<char>(v.asInt()));
+        return v; // тот же тип
+    }
+
+    if (auto* n = dynamic_cast<const parser::UnaryOp*>(&expr)) {//унарные операторы
+        Value v = evalExpr(*n->operand);
+        if (n->op == parser::UnOp::Neg) {
+            if (v.isInt())   return Value(-v.asInt());
+            if (v.isFloat()) return Value(-v.asFloat());
+            runtimeError("унарный минус: не число", n->pos.line);
+        }
+        if (n->op == parser::UnOp::Not) {
+            if (v.isBool()) return Value(!v.asBool());
+            runtimeError("not: не bool", n->pos.line);
+        }
+    }
+
 }
