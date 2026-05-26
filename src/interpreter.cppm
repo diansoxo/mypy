@@ -215,4 +215,18 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
         return Value(std::move(s));
     }
 
+    if (auto* n = dynamic_cast<const parser::ArrayAccess*>(&expr)) {// индексирование
+        Value base  = evalExpr(*n->base);
+        Value index = evalExpr(*n->index);
+        if (!base.isArray())
+            runtimeError("индексирование не-массива", n->pos.line);
+        if (!index.isInt())
+            runtimeError("индекс должен быть целым", n->pos.line);
+        int64_t i = index.asInt();
+        auto& arr = base.asArray();
+        if (i < 0 || i >= static_cast<int64_t>(arr.size()))
+            runtimeError("выход за границы массива", n->pos.line);
+        return arr[i];
+    }
+
 }
