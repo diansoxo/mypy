@@ -428,5 +428,9 @@ std::optional<Signal> Interpreter::execStmt(const parser::Stmt& stmt) {
         runtimeError("неверная левая часть присваивания", n->pos.line);
     }
 
+    if (auto* n = dynamic_cast<const parser::Return*>(&stmt)) {//return
+        Value val = n->value ? evalExpr(*n->value) : Value();
+        return Signal{ ReturnSignal{ std::move(val) } };
+    }
 
 }
