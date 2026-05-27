@@ -515,4 +515,30 @@ std::optional<Signal> Interpreter::execStmt(const parser::Stmt& stmt) {
     runtimeError("неизвестная инструкция", stmt.pos.line);
 }
 
+//5 вызов пользовательской функции
+Value Interpreter::callFunc(const parser::FuncDef& fd,
+                             std::vector<Value> args,
+                             int line)
+{
+    
+    if (args.size() != fd.params.size())
+        runtimeError("неверное количество аргументов для '" + fd.name + "'", line);
+
+    pushScope();
+
+    for (size_t i = 0; i < fd.params.size(); ++i)
+        declareVar(fd.params[i].name, std::move(args[i]));
+
+    std::optional<Signal> sig;
+    if (fd.body)
+        sig = execBlock(*fd.body);
+
+    popScope();
+
+    if (sig && std::holds_alternative<ReturnSignal>(*sig))
+        return std::get<ReturnSignal>(*sig).value;
+
+    return Value();
+}
+
 }
