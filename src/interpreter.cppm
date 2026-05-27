@@ -390,4 +390,43 @@ std::optional<Signal> Interpreter::execBlock(const parser::Block& block) {
     return std::nullopt;
 }
 
+std::optional<Signal> Interpreter::execStmt(const parser::Stmt& stmt) {
+
+    if (auto* n = dynamic_cast<const parser::VarDecl*>(&stmt)) {//let x=
+        Value val = evalExpr(*n->init);
+        declareVar(n->name, std::move(val));
+        return std::nullopt;
+    }
+
+    if (auto* n = dynamic_cast<const parser::Assign*>(&stmt)) {//x =
+        Value val = evalExpr(*n->value);
+
+        
+        if (auto* id = dynamic_cast<const parser::Identifier*>(n->target.get())) {// простое присваивание
+            setVar(id->name, std::move(val), n->pos.line);
+            return std::nullopt;
+        }
+    
+        if (auto* aa = dynamic_cast<const parser::ArrayAccess*>(n->target.get())) {// масиивы
+            Value& arr = getVar(
+                dynamic_cast<const parser::Identifier*>(aa->base.get())->name,
+                n->pos.line);
+            int64_t i = evalExpr(*aa->index).asInt();
+            if (i < 0 || i >= static_cast<int64_t>(arr.asArray().size()))
+                runtimeError("выход за границы массива", n->pos.line);
+            arr.asArray()[i] = std::move(val);
+            return std::nullopt;
+        }
+        
+        if (auto* fa = dynamic_cast<const parser::FieldAccess*>(n->target.get())) {// s.field
+            Value& obj = getVar(
+                dynamic_cast<const parser::Identifier*>(fa->object.get())->name,
+                n->pos.line);
+            obj.asStruct()[fa->field] = std::move(val);
+            return std::nullopt;
+        }
+        runtimeError("неверная левая часть присваивания", n->pos.line);
+    }
+
+
 }
