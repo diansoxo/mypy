@@ -374,4 +374,20 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
     runtimeError("неизвестное выражение", 0);
 }
 
+
+//4 execStmt и execBlock
+
+std::optional<Signal> Interpreter::execBlock(const parser::Block& block) {
+    pushScope(); // входим в блок — новая область видимости
+    for (auto& s : block.stmts) {
+        auto sig = execStmt(*s);
+        if (sig) { // был return/break/continue - передаём наверх
+            popScope();
+            return sig;
+        }
+    }
+    popScope();
+    return std::nullopt;
+}
+
 }
