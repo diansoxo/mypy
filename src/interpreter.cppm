@@ -347,7 +347,7 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
         Value builtin = callBuiltin(callee->name, n->args, n->pos.line);// сначала проверяем встроенные
         if (!builtin.isVoid() || callee->name == "print" ||
             callee->name == "println" || callee->name == "exit" ||
-            callee->name == "panic"   || callee->name == "assert" ||
+            callee->name == "panic" || callee->name == "assert" ||
             callee->name == "input")
             return builtin;
 
@@ -360,5 +360,18 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
             args.push_back(evalExpr(*a));
         return callFunc(*it->second, std::move(args), n->pos.line);
     }
+
+    if (auto* n = dynamic_cast<const parser::EnumLiteral*>(&expr))// enum литерал
+        return Value(n->variant_name);
+
+    if (auto* n = dynamic_cast<const parser::TupleLiteral*>(&expr)) {// кортеж
+        Value::Array arr;
+        for (auto& el : n->elements)
+            arr.push_back(evalExpr(*el));
+        return Value(std::move(arr));
+    }
+
+    runtimeError("неизвестное выражение", 0);
+}
 
 }
