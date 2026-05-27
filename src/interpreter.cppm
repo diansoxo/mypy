@@ -339,5 +339,26 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
         }
     }
 
+    if (auto* n = dynamic_cast<const parser::Call*>(&expr)) {// вызов функции
+        auto* callee = dynamic_cast<const parser::Identifier*>(n->callee.get());
+        if (!callee)
+            runtimeError("вызов только по имени", n->pos.line);
+
+        Value builtin = callBuiltin(callee->name, n->args, n->pos.line);// сначала проверяем встроенные
+        if (!builtin.isVoid() || callee->name == "print" ||
+            callee->name == "println" || callee->name == "exit" ||
+            callee->name == "panic"   || callee->name == "assert" ||
+            callee->name == "input")
+            return builtin;
+
+        auto it = functions_.find(callee->name);// пользовательская функция
+        if (it == functions_.end())
+            runtimeError("функция '" + callee->name + "' не найдена", n->pos.line);
+
+        std::vector<Value> args;
+        for (auto& a : n->args)
+            args.push_back(evalExpr(*a));
+        return callFunc(*it->second, std::move(args), n->pos.line);
+    }
 
 }
