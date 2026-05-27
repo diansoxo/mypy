@@ -516,9 +516,7 @@ std::optional<Signal> Interpreter::execStmt(const parser::Stmt& stmt) {
 }
 
 //5 вызов пользовательской функции
-Value Interpreter::callFunc(const parser::FuncDef& fd,
-                             std::vector<Value> args,
-                             int line)
+Value Interpreter::callFunc(const parser::FuncDef& fd, std::vector<Value> args, int line)
 {
     
     if (args.size() != fd.params.size())
@@ -539,6 +537,72 @@ Value Interpreter::callFunc(const parser::FuncDef& fd,
         return std::get<ReturnSignal>(*sig).value;
 
     return Value();
+}
+
+//6  встроенные функции
+Value Interpreter::callBuiltin(const std::string& name, const std::vector<parser::ExprPtr>& arg_nodes, int line)
+{
+    if (name == "print") {// print
+        for (auto& a : arg_nodes)
+            std::cout << evalExpr(*a).toString();
+        return Value();
+    }
+
+    if (name == "println") {// println
+        for (auto& a : arg_nodes)
+            std::cout << evalExpr(*a).toString();
+        std::cout << "\n";
+        return Value();
+    }
+
+    if (name == "input") {// input
+        std::string s;
+        std::getline(std::cin, s);
+        return Value(s);
+    }
+
+    if (name == "len") {// len
+        if (arg_nodes.size() != 1)
+            runtimeError("'len' принимает 1 аргумент", line);
+        Value v = evalExpr(*arg_nodes[0]);
+        if (v.isString())
+            return Value(static_cast<int64_t>(v.asString().size()));
+        if (v.isArray())
+            return Value(static_cast<int64_t>(v.asArray().size()));
+        runtimeError("'len' ожидает string или array", line);
+    }
+    
+    if (name == "exit") {// exit
+        if (arg_nodes.size() != 1)
+            runtimeError("'exit' принимает 1 аргумент", line);
+        Value code = evalExpr(*arg_nodes[0]);
+        if (!code.isInt())
+            runtimeError("'exit' ожидает целый тип", line);
+        std::exit(static_cast<int>(code.asInt()));
+    }
+
+    if (name == "panic") {// panic 
+        if (arg_nodes.size() != 1)
+            runtimeError("'panic' принимает 1 аргумент", line);
+        Value msg = evalExpr(*arg_nodes[0]);
+        std::cerr << "panic: " << msg.toString() << "\n";
+        std::exit(1);
+    }
+
+    if (name == "assert") {// assert
+        if (arg_nodes.size() != 1)
+            runtimeError("'assert' принимает 1 аргумент", line);
+        Value cond = evalExpr(*arg_nodes[0]);
+        if (!cond.isBool())
+            runtimeError("'assert' ожидает bool", line);
+        if (!cond.asBool()) {
+            std::cerr << "assertion failed at line " << line << "\n";
+            std::exit(1);
+        }
+        return Value();
+    }
+
+    return Value();// не встроенная функция- возвращаем пустую строку
 }
 
 }
