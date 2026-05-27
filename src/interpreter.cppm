@@ -433,4 +433,15 @@ std::optional<Signal> Interpreter::execStmt(const parser::Stmt& stmt) {
         return Signal{ ReturnSignal{ std::move(val) } };
     }
 
+    if (auto* n = dynamic_cast<const parser::If*>(&stmt)) { //if else
+        Value cond = evalExpr(*n->condition);
+        if (!cond.isBool())
+            runtimeError("условие if должно быть bool", n->pos.line);
+        if (cond.asBool())
+            return execBlock(*n->then_block);
+        else if (n->else_block)
+            return execBlock(*n->else_block);
+        return std::nullopt;
+    }
+
 }
