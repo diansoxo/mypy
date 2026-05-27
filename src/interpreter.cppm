@@ -444,4 +444,24 @@ std::optional<Signal> Interpreter::execStmt(const parser::Stmt& stmt) {
         return std::nullopt;
     }
 
+    if (auto* n = dynamic_cast<const parser::While*>(&stmt)) {//while
+        while (true) {
+            Value cond = evalExpr(*n->condition);
+            if (!cond.isBool())
+                runtimeError("условие while должно быть bool", n->pos.line);
+            if (!cond.asBool()) break;
+
+            auto sig = execBlock(*n->body);
+            if (sig) {
+                if (std::holds_alternative<BreakSignal>(*sig))
+                    break;
+                if (std::holds_alternative<ContinueSignal>(*sig))
+                    continue;
+                return sig;
+            }
+        }
+        return std::nullopt;
+    }
+
+
 }
