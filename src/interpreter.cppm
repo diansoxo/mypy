@@ -483,5 +483,36 @@ std::optional<Signal> Interpreter::execStmt(const parser::Stmt& stmt) {
         return std::nullopt;
     }
 
+    if (dynamic_cast<const parser::Break*>(&stmt))// break
+        return Signal{ BreakSignal{} };
+
+   
+    if (dynamic_cast<const parser::Continue*>(&stmt)) //continue
+        return Signal{ ContinueSignal{} };
+
+    if (dynamic_cast<const parser::Pass*>(&stmt))// pass
+        return std::nullopt;
+
+    
+    if (auto* n = dynamic_cast<const parser::ExprStmt*>(&stmt)) {// expr; (вызов функции как инструкция)
+        evalExpr(*n->expr); // вычисляем, результат выбрасываем
+        return std::nullopt;
+    }
+
+    if (auto* n = dynamic_cast<const parser::Match*>(&stmt)) {// match
+        Value val = evalExpr(*n->expr);
+        for (auto& arm : n->arms) {
+            if (arm.is_wildcard) {
+                return execStmt(*arm.body); // _ всегда совпадает
+            }
+            Value pat = evalExpr(*arm.pattern);
+            if (val == pat)
+                return execStmt(*arm.body);
+        }
+        return std::nullopt;//ни один варинат не совпал
+    }
+
+    runtimeError("неизвестная инструкция", stmt.pos.line);
+}
 
 }
