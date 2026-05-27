@@ -272,4 +272,72 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
         }
     }
 
+    if (auto* n = dynamic_cast<const parser::BinaryOp*>(&expr)) {//бинарные
+        Value l = evalExpr(*n->left);
+        Value r = evalExpr(*n->right);
+        using B = parser::BinOp;
+
+        switch (n->op) {
+            case B::Add:// арифметика
+                if (l.isInt() && r.isInt()) return Value(l.asInt() + r.asInt());
+                if (l.isFloat() && r.isFloat()) return Value(l.asFloat() + r.asFloat());
+                if (l.isString()&& r.isString())return Value(l.asString()+ r.asString());
+                runtimeError("'+': несовместимые типы", n->pos.line);
+            case B::Sub:
+                if (l.isInt() && r.isInt()) return Value(l.asInt() - r.asInt());
+                if (l.isFloat() && r.isFloat()) return Value(l.asFloat() - r.asFloat());
+                runtimeError("'-': несовместимые типы", n->pos.line);
+            case B::Mul:
+                if (l.isInt() && r.isInt()) return Value(l.asInt() * r.asInt());
+                if (l.isFloat() && r.isFloat()) return Value(l.asFloat() * r.asFloat());
+                runtimeError("'*': несовместимые типы", n->pos.line);
+            case B::Div:
+                if (l.isInt() && r.isInt()) {
+                    if (r.asInt() == 0)
+                        runtimeError("деление на ноль", n->pos.line);
+                    return Value(l.asInt() / r.asInt());
+                }
+                if (l.isFloat() && r.isFloat()) return Value(l.asFloat() / r.asFloat());
+                runtimeError("'/': несовместимые типы", n->pos.line);
+            case B::Mod:
+                if (l.isInt() && r.isInt()) {
+                    if (r.asInt() == 0)
+                        runtimeError("остаток от деления на ноль", n->pos.line);
+                    return Value(l.asInt() % r.asInt());
+                }
+                runtimeError("'%': только целые", n->pos.line);
+
+            case B::Eq: return Value(l == r);// сравнения
+            case B::Ne: return Value(l != r);
+            case B::Lt:
+                if (l.isInt() && r.isInt()) return Value(l.asInt() < r.asInt());
+                if (l.isFloat() && r.isFloat()) return Value(l.asFloat() < r.asFloat());
+                if (l.isChar() && r.isChar())  return Value(l.asChar() < r.asChar());
+                runtimeError("'<': несовместимые типы", n->pos.line);
+            case B::Gt:
+                if (l.isInt() && r.isInt()) return Value(l.asInt() > r.asInt());
+                if (l.isFloat() && r.isFloat()) return Value(l.asFloat() > r.asFloat());
+                if (l.isChar() && r.isChar()) return Value(l.asChar() > r.asChar());
+                runtimeError("'>': несовместимые типы", n->pos.line);
+            case B::Le:
+                if (l.isInt() && r.isInt()) return Value(l.asInt() <= r.asInt());
+                if (l.isFloat() && r.isFloat()) return Value(l.asFloat() <= r.asFloat());
+                if (l.isChar() && r.isChar()) return Value(l.asChar() <= r.asChar());
+                runtimeError("'<=': несовместимые типы", n->pos.line);
+            case B::Ge:
+                if (l.isInt() && r.isInt()) return Value(l.asInt() >= r.asInt());
+                if (l.isFloat() && r.isFloat()) return Value(l.asFloat() >= r.asFloat());
+                if (l.isChar() && r.isChar()) return Value(l.asChar() >= r.asChar());
+                runtimeError("'>=': несовместимые типы", n->pos.line);
+
+            case B::And:// логика
+                if (l.isBool() && r.isBool()) return Value(l.asBool() && r.asBool());
+                runtimeError("'and': не bool", n->pos.line);
+            case B::Or:
+                if (l.isBool() && r.isBool()) return Value(l.asBool() || r.asBool());
+                runtimeError("'or': не bool", n->pos.line);
+        }
+    }
+
+
 }
