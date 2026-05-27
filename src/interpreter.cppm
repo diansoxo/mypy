@@ -16,7 +16,7 @@ struct Value {
     using Array  = std::vector<Value>;
     using Struct = std::unordered_map<std::string, Value>;
 
-    std::variant
+    std::variant<
         std::monostate,
         int64_t,
         double,
