@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(LexerParserTests CXX)
+project(mypy CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -38,3 +38,14 @@ target_sources(test_semantic
         semantic.cppm
 )
 add_test(NAME SemanticTests COMMAND test_semantic)
+
+add_executable(mypy main.cpp)
+target_sources(mypy
+    PUBLIC FILE_SET CXX_MODULES FILES
+        tokens.cppm
+        ast.cppm
+        lexer.cppm
+        parser.cppm
+        semantic.cppm
+        interpreter.cppm
+)
