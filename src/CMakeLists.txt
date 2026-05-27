@@ -3,6 +3,8 @@ project(mypy CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+add_compile_options(-stdlib=libc++ -I/usr/lib/llvm-18/include/c++/v1)
+add_link_options(-stdlib=libc++)
 
 
 add_executable(test_lexer test_lexer.cpp)
