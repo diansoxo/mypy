@@ -463,5 +463,25 @@ std::optional<Signal> Interpreter::execStmt(const parser::Stmt& stmt) {
         return std::nullopt;
     }
 
+    if (auto* n = dynamic_cast<const parser::For*>(&stmt)) {//for
+        Value& iter = getVar(n->iter_name, n->pos.line);
+        if (!iter.isArray())
+            runtimeError("for: ожидается массив", n->pos.line);
+        for (auto& elem : iter.asArray()) {
+            pushScope();
+            declareVar(n->var_name, elem); // x = текущий элемент
+            auto sig = execBlock(*n->body);
+            popScope();
+            if (sig) {
+                if (std::holds_alternative<BreakSignal>(*sig))
+                    break;
+                if (std::holds_alternative<ContinueSignal>(*sig))
+                    continue;
+                return sig;
+            }
+        }
+        return std::nullopt;
+    }
+
 
 }
