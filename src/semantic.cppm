@@ -154,6 +154,23 @@ AnalysisResult SemanticAnalyzer::analyze(const parser::Program& program) {
     for (auto& d : program.decls)
         checkDecl(*d);
 
+    {
+        auto it = functions_.find("main");//изм2
+        if (it == functions_.end()) {
+            diagnostics_.push_back(Diagnostic{filename_, 0, 0,
+                "отсутствует функция 'main'"});
+        } else {
+            auto& info = it->second;
+            if (info.return_type != "int32" && info.return_type != "int64")
+                diagnostics_.push_back(Diagnostic{filename_, 0, 0,
+                    "функция 'main' должна возвращать int32 или int64"});
+            if (!info.param_types.empty())
+                diagnostics_.push_back(Diagnostic{filename_, 0, 0,
+                    "функция 'main' не должна принимать параметры"});
+            }
+        }
+
+
     // упаковываем все найденные ошибки в результат и возвращаем
     return AnalysisResult{ std::move(diagnostics_) };
 }
@@ -427,6 +444,17 @@ void SemanticAnalyzer::checkFor(const parser::For& node) { // итерируем
     loop_depth_++;
     pushScope();
     std::string elem_type = "";
+
+    const VarInfo* iter_info = lookupVar(node.iter_name);//изм2
+    if (iter_info) {
+        const std::string& arr_type = iter_info->type_name;
+        if (!arr_type.empty() && arr_type.front() == '[') {
+            auto semi = arr_type.find(';');
+            if (semi != std::string::npos)
+                elem_type = arr_type.substr(1, semi - 1);
+        }
+    }
+
     declareVar(node.var_name, VarInfo{ elem_type, false, node.pos.line, node.pos.col });
     checkBlock(*node.body);
     popScope();
@@ -517,7 +545,19 @@ std::string SemanticAnalyzer::checkBinaryOp(const parser::BinaryOp& node) {
     using B = parser::BinOp;
  
     switch (node.op) {
-        case B::Add: case B::Sub: case B::Mul:// арифметика
+        case B::Add://изм2
+            if (!lt.empty() && !rt.empty() &&
+                resolveAlias(lt) == "string" && resolveAlias(rt) == "string")
+                return "string";
+            if (!lt.empty() && !isNumericType(lt))
+                error(node.pos.line, node.pos.col, "'+': ожидается числовой тип или string, получено '" + lt + "'");
+            if (!rt.empty() && !isNumericType(rt))
+                error(node.pos.line, node.pos.col, "'+': ожидается числовой тип или string, получено '" + rt + "'");
+            if (!typesCompatible(lt, rt))
+                 error(node.pos.line, node.pos.col, "несовместимые типы в '+': '" + lt + "' и '" + rt + "'");
+            return lt;
+
+        case B::Sub: case B::Mul:// арифметика
         case B::Div: case B::Mod:
             if (!lt.empty() && !isNumericType(lt))
                 error(node.pos.line, node.pos.col, "арифметическая операция требует числового типа, получено '" + lt + "'");
@@ -600,14 +640,19 @@ std::string SemanticAnalyzer::checkCall(const parser::Call& node) {
 }
  
 std::string SemanticAnalyzer::checkArrayAccess(const parser::ArrayAccess& node) {
-    checkExpr(*node.base);
+    std::string base_type = checkExpr(*node.base);
     std::string idx_type = checkExpr(*node.index);
     if (!idx_type.empty() && !isIntegerType(idx_type))
         error(node.pos.line, node.pos.col, "индекс массива должен быть целым числом, получено '" + idx_type + "'");
- 
+    
+    if (!base_type.empty() && base_type.front() == '[') {//изм2  base_type выглядит как "[int32; 10]" — достаём тип элемента
+        auto semi = base_type.find(';');
+        if (semi != std::string::npos)
+            return base_type.substr(1, semi - 1);
+    }
     return "";
 }
- 
+
 std::string SemanticAnalyzer::checkFieldAccess(const parser::FieldAccess& node) {
     std::string obj_type = checkExpr(*node.object);
     if (obj_type.empty()) return "";
@@ -720,6 +765,16 @@ std::string SemanticAnalyzer::checkBuiltin(
         return "void";
     }
 
+    if (name == "len") {//изм2
+        if (args.size() != 1)
+            error(0, 0, "'len' принимает ровно 1 аргумент");
+        else {
+            std::string t = checkExpr(*args[0]);
+            if (!t.empty() && resolveAlias(t) != "string" && t.front() != '[')
+                error(0, 0, "'len' ожидает string или массив, получено '" + t + "'");
+        }
+        return "int32";
+    }
     return ""; // не встроенная
 }
 
