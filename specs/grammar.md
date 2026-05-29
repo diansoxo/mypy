@@ -57,7 +57,6 @@ digit = "0".."9"
 #### вещественные:
 float_literal = ["-"] ( digit { digit } "." { digit } ) | ( "." digit { digit } )
 
-
 #### строки:
 string_literal = '"' { character } '"'
 character = любой символ, кроме `"` и `\n` | escape_sequence
@@ -66,6 +65,10 @@ escape_sequence = "\\" ("n" | "t" | "\"" | "\\")
 #### булевы значения:
 boolean_literal = "true" | "false"
 
+#### символьные литералы:
+char_literal = "'" character "'"
+character = любой ASCII символ | escape_sequence
+escape_sequence = "\\" ("n" | "t" | "'" | "\\")
 
 
 ### 1.7 Операторы
