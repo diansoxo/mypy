@@ -5,6 +5,7 @@ module;
 #include <expected>
 #include <iostream>
 #include <cassert>
+#include <limits>
 
 export module parser;
 import tokens;
@@ -370,7 +371,12 @@ std::expected<ExprPtr, Diagnostic> Parser::parsePrimary() {//изм
         auto tok = advance();
         auto node = std::make_unique<FloatLiteral>();
         node->pos = pos;
-        node->value = std::stod(tok.value);
+        if (tok.value == "inf")//изм2
+            node->value = std::numeric_limits<double>::infinity();
+        else if (tok.value == "NaN" || tok.value == "nan")
+            node->value = std::numeric_limits<double>::quiet_NaN();
+        else
+            node->value = std::stod(tok.value);
         return node;
     }
     if (check(TokenType::STRING_LITERAL)) {
