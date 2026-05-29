@@ -101,12 +101,51 @@ std::expected<Token, Diagnostic> Lexer::readNumber() {//число или оши
     std::string buf;
     bool isFloat = false;
 
-    while (!isAtEnd() && std::isdigit(current()))
+    if (current() == '0' && (peek() == 'x' || peek() == 'X')) {//изм2
+         buf += advance();
+         buf += advance();
+        if (!std::isxdigit(current()))
+            return std::unexpected(makeDiag("ожидается hex-цифра после '0x'"));
+        while (!isAtEnd() && std::isxdigit(current()))
+            buf += advance();
+        int64_t val = std::stoll(buf, nullptr, 16);// конвертируем в десятичное для хранения
+        return Token{TokenType::INT_LITERAL, std::to_string(val), startLine, startCol};
+    }
+
+    if (current() == '0' && (peek() == 'b' || peek() == 'B')) {//изм2
+        buf += advance();
+        buf += advance();
+        if (current() != '0' && current() != '1')
+            return std::unexpected(makeDiag("ожидается 0 или 1 после '0b'"));
+        while (!isAtEnd() && (current() == '0' || current() == '1'))
+            buf += advance();
+        int64_t val = std::stoll(buf.substr(2), nullptr, 2);
+        return Token{TokenType::INT_LITERAL, std::to_string(val), startLine, startCol};
+    }
+
+    while (!isAtEnd() && std::isdigit(current()))//изм2
         buf += advance();
 
-    if (current() == '.' && std::isdigit(peek())) {//точка после цифр тогда float но только если за точкой ещё цифра
+    if (current() == '.' && std::isdigit(peek())) {//изм2
         isFloat = true;
         buf += advance();
+        while (!isAtEnd() && std::isdigit(current()))
+            buf += advance();
+    }
+    
+    if (!isFloat && (current() == 'e' || current() == 'E')) {// экспоненциальная нотация изм2
+        isFloat = true;
+        buf += advance();
+        if (current() == '+' || current() == '-') buf += advance();
+        if (!std::isdigit(current()))
+            return std::unexpected(makeDiag("ожидается цифра в экспоненте"));
+        while (!isAtEnd() && std::isdigit(current()))
+            buf += advance();
+    } else if (isFloat && (current() == 'e' || current() == 'E')) {
+        buf += advance();
+        if (current() == '+' || current() == '-') buf += advance();
+        if (!std::isdigit(current()))
+            return std::unexpected(makeDiag("ожидается цифра в экспоненте"));
         while (!isAtEnd() && std::isdigit(current()))
             buf += advance();
     }
@@ -212,6 +251,8 @@ Token Lexer::readIdentOrKeyword() {
 
     while (!isAtEnd() && (std::isalnum(current()) || current() == '_'))
         buf += advance();
+    if (buf == "inf" || buf == "NaN")//изм2
+        return Token{TokenType::FLOAT_LITERAL, buf, startLine, startCol};
 
     return Token{lookupKeyword(buf), buf, startLine, startCol};
 }
