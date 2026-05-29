@@ -442,23 +442,7 @@ void SemanticAnalyzer::checkAssign(const parser::Assign& as) {//изм2
               "несовместимые типы при присваивании: ожидается '" +
               lval_type + "', получено '" + val_type + "'");
 }
- 
-    // переменная должна существовать
-    const VarInfo* info = lookupVar(id->name);
-    if (!info) {
-        error(as.pos.line, as.pos.col, "переменная '" + id->name + "' не объявлена");
-        return;
-    }
- 
-    // переменная должна быть изменяемой (mut)
-    if (!info->is_mut)
-        error(as.pos.line, as.pos.col,"переменная '" + id->name + "' неизменяемая: объявите через 'let mut'");
- 
-    // тип правой части должен совпадать с типом переменной
-    std::string val_type = checkExpr(*as.value);
-    if (!typesCompatible(info->type_name, val_type))
-        error(as.pos.line, as.pos.col, "несовместимые типы при присваивании '" + id->name + "': ожидается '" + info->type_name + "', получено '" + val_type + "'");
-}
+
 void SemanticAnalyzer::checkReturn(const parser::Return& ret) {
     if (ret.value) {
         std::string val_type = checkExpr(*ret.value);// return с выражением
