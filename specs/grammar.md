@@ -16,8 +16,7 @@ x = 10  # комментарий после кода
 
 ### 1.3 Ключевые слова
 func
-if 
-elif ---
+if
 else
 while
 for
@@ -398,7 +397,9 @@ primary = literal
         | struct_literal
         | tuple_literal
         | enum_literal
-        | cast
+        |cast
+        |field_access
+
 
 
 #### Литералы
@@ -440,6 +441,12 @@ cast = primary "as" basic_type
 
 Пример: x as float64, count as int32
 
+
+#### Доступ к полю структуры
+field_access = primary "." identifier
+Пример: p.x, point.y
+
+
 ### 2.6.1 литералы перечислений
 enum_literal = identifier "." identifier
 
@@ -461,7 +468,7 @@ enum Option {
 ### 2.7 Точка входа
 Каждая программа обязана содержать функцию main
 
-func main() -> int {
+func main() -> int32 {
     return 0
 }
 
