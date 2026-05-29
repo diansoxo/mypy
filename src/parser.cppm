@@ -732,14 +732,18 @@ std::expected<StmtPtr, Diagnostic> Parser::parseVarDecl() {
     pos, is_mut, name, type_name, std::move(*init_res));
 }
 
-std::expected<StmtPtr, Diagnostic> Parser::parseAssignOrExprStmt() {
+std::expected<StmtPtr, Diagnostic> Parser::parseAssignOrExprStmt() {//изм2
     auto pos = Position{current().line, current().col};
-    if (check(TokenType::IDENTIFIER) &&// если след токен = то присваивание
-        peek(1).type == TokenType::ASSIGN)
+    auto expr_res = parseExpr();
+    if (!expr_res) return std::unexpected(expr_res.error());
+
+    if (check(TokenType::ASSIGN))
     {
-        std::string name = current().value;
-        advance();//имя
-        advance(); //=
+        auto* lval = expr_res->get();
+        bool is_lval = dynamic_cast<Identifier*>(lval) || dynamic_cast<ArrayAccess*>(lval) || dynamic_cast<FieldAccess*>(lval);
+        if (!is_lval)
+            return std::unexpected(makeDiag("левая часть присваивания не является lvalue"));
+        advance();
 
         auto val_res = parseExpr();
         if (!val_res) return std::unexpected(val_res.error());
@@ -748,16 +752,11 @@ std::expected<StmtPtr, Diagnostic> Parser::parseAssignOrExprStmt() {
             return std::unexpected(makeDiag("ожидается перенос строки после присваивания"));
 
         auto node = std::make_unique<Assign>();
-        node->pos = pos;//изм
-        auto target_node = std::make_unique<Identifier>();
-        target_node->pos = pos;
-        target_node->name = name;
-        node->target = std::move(target_node);
+        node->pos = pos;
+        node->target = std::move(*expr_res);
         node->value = std::move(*val_res);
         return node;
     }
-    auto expr_res = parseExpr();//иначе выражение как инструкция
-    if (!expr_res) return std::unexpected(expr_res.error());
  
     if (!check(TokenType::NEWLINE) && !check(TokenType::EOF_TOKEN))
         return std::unexpected(makeDiag("ожидается перенос строки после выражения"));
