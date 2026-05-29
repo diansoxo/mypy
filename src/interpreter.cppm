@@ -6,6 +6,7 @@ module;
 #include <optional>
 #include <iostream>
 #include <cstdlib>
+#include <unordered_set>
 export module interpreter;
 import ast;
 import parser;
@@ -112,6 +113,12 @@ private:
     void declareVar(const std::string& name, Value val);
     void setVar(const std::string& name, Value val, int line);
     Value& getVar(const std::string& name, int line);
+    static bool isBuiltinName(const std::string& name) {//изм2
+        static const std::unordered_set<std::string> builtins = {
+            "print","println","input","len","exit","panic","assert"
+        };
+        return builtins.count(name) > 0;
+    }
 
     Value evalExpr(const parser::Expr& expr);
     std::optional<Signal> execStmt(const parser::Stmt& stmt);
@@ -344,12 +351,9 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
         if (!callee)
             runtimeError("вызов только по имени", n->pos.line);
 
-        Value builtin = callBuiltin(callee->name, n->args, n->pos.line);// сначала проверяем встроенные
-        if (!builtin.isVoid() || callee->name == "print" ||
-            callee->name == "println" || callee->name == "exit" ||
-            callee->name == "panic" || callee->name == "assert" ||
-            callee->name == "input" || callee->name == "len")//изм2
-            return builtin;
+
+        if (isBuiltinName(callee->name))//изм2
+            return callBuiltin(callee->name, n->args, n->pos.line);
 
         auto it = functions_.find(callee->name);// пользовательская функция
         if (it == functions_.end())
