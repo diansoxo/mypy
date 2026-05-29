@@ -348,7 +348,7 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
         if (!builtin.isVoid() || callee->name == "print" ||
             callee->name == "println" || callee->name == "exit" ||
             callee->name == "panic" || callee->name == "assert" ||
-            callee->name == "input")
+            callee->name == "input" || callee->name == "len")//изм2
             return builtin;
 
         auto it = functions_.find(callee->name);// пользовательская функция
@@ -470,7 +470,11 @@ std::optional<Signal> Interpreter::execStmt(const parser::Stmt& stmt) {
         for (auto& elem : iter.asArray()) {
             pushScope();
             declareVar(n->var_name, elem); // x = текущий элемент
-            auto sig = execBlock(*n->body);
+            std::optional<Signal> sig;
+            for (auto& s : n->body->stmts) {//изм2 без лишнего scope
+                sig = execStmt(*s);
+                if (sig) break;
+            }
             popScope();
             if (sig) {
                 if (std::holds_alternative<BreakSignal>(*sig))
