@@ -480,7 +480,7 @@ std::expected<ExprPtr, Diagnostic> Parser::parseIdentOrCall() {
         auto node = std::make_unique<EnumLiteral>();
         node->pos = pos;
         node->enum_name = name;
-        node->variant_name = variant;
+        node->variant_name = member;
         return node;
     }
  
