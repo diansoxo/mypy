@@ -7,6 +7,8 @@ module;
 #include <iostream>
 #include <cstdlib>
 #include <unordered_set>
+#include <sstream>
+#include <limits>
 export module interpreter;
 import ast;
 import parser;
@@ -59,7 +61,15 @@ struct Value {
     std::string toString() const {
         if (isVoid()) return "void";
         if (isInt()) return std::to_string(asInt());
-        if (isFloat()) return std::to_string(asFloat());
+        if (isFloat()) {//изм2
+            double v = asFloat();
+            if (v != v) return "NaN";
+            if (v == std::numeric_limits<double>::infinity()) return "inf";
+            if (v == -std::numeric_limits<double>::infinity()) return "-inf";
+            std::ostringstream ss;
+            ss << v;
+            return ss.str();
+        }
         if (isBool()) return asBool() ? "true" : "false";
         if (isChar()) return std::string(1, asChar());
         if (isString()) return asString();
@@ -173,6 +183,12 @@ int Interpreter::run() {
     for (auto& d : program_.decls) {
         if (auto* fd = dynamic_cast<const parser::FuncDef*>(d.get()))
             functions_[fd->name] = fd;
+        if (auto* nd = dynamic_cast<const parser::NamespaceDecl*>(d.get())) {
+            for (auto& inner : nd->decls) {
+                if (auto* fd = dynamic_cast<const parser::FuncDef*>(inner.get()))
+                    functions_[nd->name + "." + fd->name] = fd;
+            }
+        }
     }
     auto it = functions_.find("main");
     if (it == functions_.end()) {
@@ -347,6 +363,20 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
     }
 
     if (auto* n = dynamic_cast<const parser::Call*>(&expr)) {// вызов функции
+
+    if (auto* fa = dynamic_cast<const parser::FieldAccess*>(n->callee.get())) {//изм2
+        Value obj = evalExpr(*fa->object);
+        std::vector<Value> args;
+        args.push_back(obj); // первый аргумент — сам объект (self)
+        for (auto& a : n->args)
+            args.push_back(evalExpr(*a));
+        auto it = functions_.find(fa->field);
+        if (it == functions_.end())
+            runtimeError("метод '" + fa->field + "' не найден", n->pos.line);
+        return callFunc(*it->second, std::move(args), n->pos.line);
+    }
+
+
         auto* callee = dynamic_cast<const parser::Identifier*>(n->callee.get());
         if (!callee)
             runtimeError("вызов только по имени", n->pos.line);
