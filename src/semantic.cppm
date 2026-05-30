@@ -227,8 +227,15 @@ void SemanticAnalyzer::collectDecl(const parser::Decl& decl) {//только з�
     }
     
     if (auto* nd = dynamic_cast<const parser::NamespaceDecl*>(&decl)) {
-        for (auto& d : nd->decls)
-            collectDecl(*d); //рекурсивно собираем функции внутри
+        for (auto& d : nd->decls){
+            if (auto* fd = dynamic_cast<const parser::FuncDef*>(d.get())) {//изм2
+                FuncInfo info;
+                for (auto& p : fd->params)
+                    info.param_types.push_back(p.type_name);
+                info.return_type = fd->return_type.empty() ? "void" : fd->return_type;
+                functions_[nd->name + "." + fd->name] = std::move(info);
+            }
+        }
         return;
     }
     
@@ -640,6 +647,19 @@ std::string SemanticAnalyzer::checkUnaryOp(const parser::UnaryOp& node) {
 }
  
 std::string SemanticAnalyzer::checkCall(const parser::Call& node) {
+
+    if (auto* fa = dynamic_cast<const parser::FieldAccess*>(node.callee.get())) {//изм2
+        checkExpr(*fa->object);
+        auto it = functions_.find(fa->field);
+        if (it == functions_.end()) {
+            error(node.pos.line, node.pos.col,
+                  "метод '" + fa->field + "' не объявлен");
+            for (auto& a : node.args) checkExpr(*a);
+            return "";
+        }
+        for (auto& a : node.args) checkExpr(*a);
+        return it->second.return_type;
+    }
     auto* callee_id = dynamic_cast<const parser::Identifier*>(node.callee.get());
     if (!callee_id) {
         error(node.pos.line, node.pos.col, "вызов только по имени функции");
