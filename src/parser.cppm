@@ -448,13 +448,35 @@ std::expected<ExprPtr, Diagnostic> Parser::parseIdentOrCall() {
         return node;
     }
  
-    // enum литерал: Name.Variant
-    if (check(TokenType::DOT) &&
+    if (check(TokenType::DOT) &&// enum литерал Name.Variant
         peek(1).type == TokenType::IDENTIFIER)
     {
-        advance(); // съедаем "."
-        std::string variant = current().value;
         advance();
+        std::string member = current().value;
+        auto member_pos = Position{current().line, current().col};
+        advance();
+
+    if (check(TokenType::LPAREN)) {//изм2
+        advance();
+        auto call_node = std::make_unique<Call>();
+        call_node->pos = pos;
+        auto callee_node = std::make_unique<Identifier>();
+        callee_node->pos = pos;
+        callee_node->name = name + "." + member; // "Math.sqrt"
+        call_node->callee = std::move(callee_node);
+        if (!check(TokenType::RPAREN)) {
+            while (true) {
+                auto arg_res = parseExpr();
+                if (!arg_res) return std::unexpected(arg_res.error());
+                call_node->args.push_back(std::move(*arg_res));
+                if (!match(TokenType::COMMA)) break;
+            }
+        }
+        auto rp = expect(TokenType::RPAREN, "ожидается ')' после аргументов");
+        if (!rp) return std::unexpected(rp.error());
+        return call_node;
+    }
+
         auto node = std::make_unique<EnumLiteral>();
         node->pos = pos;
         node->enum_name = name;
