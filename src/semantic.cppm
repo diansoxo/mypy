@@ -268,6 +268,12 @@ std::string SemanticAnalyzer::resolveAlias(const std::string& type_name) const {
 
 bool SemanticAnalyzer::isKnownType(const std::string& type_name) const {//существует ли этот тип вообще
     std::string r = resolveAlias(type_name);
+    if (!r.empty() && r.front() == '[')// массив: начинается с '[' изм2
+        return true;
+
+    if (!r.empty() && r.front() == '(')// кортеж: начинается с '('
+        return true;
+
     static const std::unordered_set<std::string> builtins = {
         "int8","int16","int32","int64", 
         "uint8","uint16","uint32","uint64",
