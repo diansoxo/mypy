@@ -52,10 +52,18 @@ digit= "0".."9"
 ### 1.6 Литералы
 #### целые числа:
 integer_literal = ["-"] digit { digit }
+                | "0x" hex_digit { hex_digit }
+                | "0b" bin_digit { bin_digit }
+hex_digit = "0".."9" | "a".."f" | "A".."F"
+bin_digit = "0" | "1"
 digit = "0".."9"
 
 #### вещественные:
-float_literal = ["-"] ( digit { digit } "." { digit } ) | ( "." digit { digit } )
+float_literal = ["-"] ( digit { digit } "." { digit } ) 
+              | ["-"] ( "." digit { digit } )
+              | ["-"] digit { digit } ("e" | "E") ["+" | "-"] digit { digit }
+              | "inf" 
+              | "NaN"
 
 #### строки:
 string_literal = '"' { character } '"'
@@ -135,22 +143,13 @@ struct_decl = "struct" identifier "{" { field_decl } "}"
 field_decl = identifier ":" type ";"
 
 #### синоним типа
-type_alias = "type" identifier "=" basic_type
+type_alias = "type" identifier "=" type
 
 Синоним типа (type alias) используется для задания нового имени базовому типу
-
-Упрощено:
-- алиасы допускаются только для базовых типов
-- пользовательские типы (struct, enum, массивы) не поддерживаются
 
 Пример:
 type MyInt= int32
 type Flag =bool
-
-Запрещено:
-- type A = Point
-- type B = [int32; 10]
-- type C = (int32, int32)
 
 #### пространство имен
 namespace_decl = "namespace" identifier "{" { function_def } "}"
@@ -161,11 +160,7 @@ namespace_decl = "namespace" identifier "{" { function_def } "}"
 - namespace содержит только функции
 - вложенные namespace не поддерживаются
 - структуры и перечисления внутри namespace запрещены
-
-Ограничения:
-- namespace не влияет на область видимости переменных
-- доступ к функциям осуществляется по имени без квалификатора
-- namespace используется только для организации кода
+- функции вызываются через квалификатор: namespace.func(args)
 
 namespace Math {
     func add(a: int32, b: int32) -> int32 {
@@ -173,9 +168,7 @@ namespace Math {
     }
 }
 
-но вызываю: add(1, 2)  без Math.add
-
-namespace = просто "папка" для функций
+let result = Math.add(1, 2)
 
 #### перечисление (enum) упрощено
 enum_decl = "enum" identifier "{" { enum_variant } "}"
@@ -222,10 +215,6 @@ impl Point {
         return p.x * p.x + p.y * p.y
     }
 }
-
-Для этго  надо
-(парсить impl
-складывать функции внутрь)
 
 ### 2.3 Типы
 type = basic_type
@@ -412,7 +401,10 @@ literal = integer_literal
         | boolean_literal
 
 #### Вызов функции
-call = identifier "(" [ arguments ] ")"
+call = identifier "(" [ arguments ] ")" | identifier "." identifier "(" [ arguments ] ")"
+
+Первая форма обычный вызов функции. Вторая форма- вызов функции из namespace или метода из impl: Math.add(1, 2), p.distance(q)
+
 arguments = expression { "," expression }
 Пример: add(5, 3), print("Hello")
 
