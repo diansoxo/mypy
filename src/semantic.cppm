@@ -284,6 +284,8 @@ bool SemanticAnalyzer::isKnownType(const std::string& type_name) const {//сущ
 
 bool SemanticAnalyzer::typesCompatible(const std::string& a, const std::string& b) const {
     if (a.empty() || b.empty()) return true; // пустая строка = ошибка уже записана, не дублируем
+    if (!a.empty() && a.front() == '(' && !b.empty() && b.front() == '(')//изм2 кортежи считаем совместимыми если оба кортежи
+        return true;
     return resolveAlias(a) == resolveAlias(b); //раскрывает оба типа через псевдонимы и сравнивает
 }
 bool SemanticAnalyzer::isNumericType(const std::string& t) const {
@@ -582,11 +584,13 @@ std::string SemanticAnalyzer::checkExpr(const parser::Expr& expr) {
  
     // TupleLiteral просто проверяем элементы, тип не выводим
     if (auto* n = dynamic_cast<const parser::TupleLiteral*>(&expr)) {
-        for (auto& el : n->elements)
-            checkExpr(*el);
+        std::string result = "(";//изм2
+        for (size_t i = 0; i < n->elements.size(); ++i)
+            if (i) result += ", ";
+            result += checkExpr(*n->elements[i]);
         return "tuple";
     }
- 
+    result += ")";//изм2
     return "";
 }
 
