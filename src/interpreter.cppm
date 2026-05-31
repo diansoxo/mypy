@@ -221,12 +221,11 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
     if (auto* n = dynamic_cast<const parser::StringLiteral*>(&expr))
         return Value(n->value);
 
-    if (auto* n = dynamic_cast<const parser::Identifier*>(&expr)){ //изм2 сначала проверяем все енам объявления, если имя это енам то возвр его имя как строку
+    if (auto* n = dynamic_cast<const parser::Identifier*>(&expr)) //изм2 сначала проверяем все енам объявления, если имя это енам то возвр его имя как строку
         for (auto& d : program_.decls) {
-            if (auto* ed = dynamic_cast<const parser::EnumDecl*>(d.get())) {
-                if (ed->name == n->name)
-                    return Value(n->name);
-            }
+        if (auto* ed = dynamic_cast<const parser::EnumDecl*>(d.get())) {
+            if (ed->name == n->name)
+                return Value(n->name);
         }
         return getVar(n->name, n->pos.line);
     }
