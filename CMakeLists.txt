@@ -51,3 +51,26 @@ target_sources(mypy
         src/semantic.cppm
         src/interpreter.cppm
 )
+
+
+add_custom_target(run # Цель run запуск с тестовым файлом
+    COMMAND ./mypy examples/hello.pyrust
+    DEPENDS mypy
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Running mypy"
+)
+
+
+add_custom_target(debug # Цель debug запуск через gdb
+    COMMAND gdb ./mypy
+    DEPENDS mypy
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Debugging mypy"
+)
+
+
+add_custom_target(clean-all # Цель clean удаление артефактов сборки
+    COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/CMakeFiles
+    COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/mypy
+    COMMENT "Cleaning build artifacts"
+)
