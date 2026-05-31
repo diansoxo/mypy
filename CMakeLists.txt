@@ -7,47 +7,47 @@ add_compile_options(-stdlib=libc++ -I/usr/lib/llvm-18/include/c++/v1)
 add_link_options(-stdlib=libc++)
 
 
-add_executable(test_lexer test_lexer.cpp)
+add_executable(test_lexer src/test_lexer.cpp)
 target_sources(test_lexer
     PUBLIC FILE_SET CXX_MODULES FILES
-    tokens.cppm
-    ast.cppm
-    lexer.cppm
+    src/tokens.cppm
+    src/ast.cppm
+    src/lexer.cppm
 )
 
 
-add_executable(test_parser test_parser.cpp)
+add_executable(test_parser src/test_parser.cpp)
 target_sources(test_parser
     PUBLIC FILE_SET CXX_MODULES FILES
-        tokens.cppm
-        ast.cppm
-        lexer.cppm
-        parser.cppm
+        src/tokens.cppm
+        src/ast.cppm
+        src/lexer.cppm
+        src/parser.cppm
 )
 
 # enable_testing() позволяет запускать через ctest
 enable_testing()
-add_test(NAME LexerTests  COMMAND test_lexer)
+add_test(NAME LexerTests COMMAND test_lexer)
 add_test(NAME ParserTests COMMAND test_parser)
 
-add_executable(test_semantic test_semantic.cpp)
+add_executable(test_semantic src/test_semantic.cpp)
 target_sources(test_semantic
     PUBLIC FILE_SET CXX_MODULES FILES
-        tokens.cppm
-        ast.cppm
-        lexer.cppm
-        parser.cppm
-        semantic.cppm
+        src/tokens.cppm
+        src/ast.cppm
+        src/lexer.cppm
+        src/parser.cppm
+        src/semantic.cppm
 )
 add_test(NAME SemanticTests COMMAND test_semantic)
 
-add_executable(mypy main.cpp)
+add_executable(mypy src/main.cpp)
 target_sources(mypy
     PUBLIC FILE_SET CXX_MODULES FILES
-        tokens.cppm
-        ast.cppm
-        lexer.cppm
-        parser.cppm
-        semantic.cppm
-        interpreter.cppm
+        src/tokens.cppm
+        src/ast.cppm
+        src/lexer.cppm
+        src/parser.cppm
+        src/semantic.cppm
+        src/interpreter.cppm
 )
