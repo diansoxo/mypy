@@ -448,21 +448,21 @@ std::expected<ExprPtr, Diagnostic> Parser::parseIdentOrCall() {
         return node;
     }
  
-    if (check(TokenType::DOT) &&// enum литерал Name.Variant
-        peek(1).type == TokenType::IDENTIFIER)
+    if (check(TokenType::DOT) &&// изм2
+        peek(1).type == TokenType::IDENTIFIER &&
+        peek(2).type == TokenType::LPAREN)
     {
         advance();
         std::string member = current().value;
         auto member_pos = Position{current().line, current().col};
         advance();
 
-    if (check(TokenType::LPAREN)) {//изм2
         advance();
         auto call_node = std::make_unique<Call>();
         call_node->pos = pos;
         auto callee_node = std::make_unique<Identifier>();
         callee_node->pos = pos;
-        callee_node->name = name + "." + member; // "Math.sqrt"
+        callee_node->name = name + "." + member;
         call_node->callee = std::move(callee_node);
         if (!check(TokenType::RPAREN)) {
             while (true) {
@@ -475,13 +475,6 @@ std::expected<ExprPtr, Diagnostic> Parser::parseIdentOrCall() {
         auto rp = expect(TokenType::RPAREN, "ожидается ')' после аргументов");
         if (!rp) return std::unexpected(rp.error());
         return call_node;
-    }
-
-        auto node = std::make_unique<EnumLiteral>();
-        node->pos = pos;
-        node->enum_name = name;
-        node->variant_name = member;
-        return node;
     }
  
     if (check(TokenType::LBRACE)&& !in_condition_) {// struct литерал: Name { field = expr } изм
