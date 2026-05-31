@@ -228,14 +228,7 @@ void SemanticAnalyzer::collectDecl(const parser::Decl& decl) {//только з�
     
     if (auto* nd = dynamic_cast<const parser::NamespaceDecl*>(&decl)) {
         for (auto& d : nd->decls){
-            if (auto* fd = dynamic_cast<const parser::FuncDef*>(d.get())) {//изм2
-                FuncInfo info;
-                for (auto& p : fd->params)
-                    info.param_types.push_back(p.type_name);
-                info.return_type = fd->return_type.empty() ? "void" : fd->return_type;
-                functions_[nd->name + "." + fd->name] = std::move(info);
-            }
-        }
+            collectDecl(*d);
         return;
     }
     
@@ -284,8 +277,7 @@ bool SemanticAnalyzer::isKnownType(const std::string& type_name) const {//сущ
 
 bool SemanticAnalyzer::typesCompatible(const std::string& a, const std::string& b) const {
     if (a.empty() || b.empty()) return true; // пустая строка = ошибка уже записана, не дублируем
-    if (!a.empty() && a.front() == '(' && !b.empty() && b.front() == '(')//изм2 кортежи считаем совместимыми если оба кортежи
-        return true;
+
     return resolveAlias(a) == resolveAlias(b); //раскрывает оба типа через псевдонимы и сравнивает
 }
 bool SemanticAnalyzer::isNumericType(const std::string& t) const {
@@ -660,19 +652,6 @@ std::string SemanticAnalyzer::checkUnaryOp(const parser::UnaryOp& node) {
 }
  
 std::string SemanticAnalyzer::checkCall(const parser::Call& node) {
-
-    if (auto* fa = dynamic_cast<const parser::FieldAccess*>(node.callee.get())) {//изм2
-        checkExpr(*fa->object);
-        auto it = functions_.find(fa->field);
-        if (it == functions_.end()) {
-            error(node.pos.line, node.pos.col,
-                  "метод '" + fa->field + "' не объявлен");
-            for (auto& a : node.args) checkExpr(*a);
-            return "";
-        }
-        for (auto& a : node.args) checkExpr(*a);
-        return it->second.return_type;
-    }
     auto* callee_id = dynamic_cast<const parser::Identifier*>(node.callee.get());
     if (!callee_id) {
         error(node.pos.line, node.pos.col, "вызов только по имени функции");
