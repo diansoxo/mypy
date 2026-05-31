@@ -889,7 +889,9 @@ std::expected<StmtPtr, Diagnostic> Parser::parseFor() {
 std::expected<StmtPtr, Diagnostic> Parser::parseMatch() {
     auto pos = Position{current().line, current().col};
     advance();
+    in_condition_ = true;
     auto expr_res = parseExpr();// выражение которое сопоставляем
+    in_condition_ = false;
     if (!expr_res) return std::unexpected(expr_res.error());
  
     skipNewlines();
