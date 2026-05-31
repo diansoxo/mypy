@@ -227,7 +227,7 @@ void SemanticAnalyzer::collectDecl(const parser::Decl& decl) {//только з�
     }
     
     if (auto* nd = dynamic_cast<const parser::NamespaceDecl*>(&decl)) {
-        for (auto& d : nd->decls){
+        for (auto& d : nd->decls)
             collectDecl(*d);
         return;
     }
@@ -577,12 +577,13 @@ std::string SemanticAnalyzer::checkExpr(const parser::Expr& expr) {
     // TupleLiteral просто проверяем элементы, тип не выводим
     if (auto* n = dynamic_cast<const parser::TupleLiteral*>(&expr)) {
         std::string result = "(";//изм2
-        for (size_t i = 0; i < n->elements.size(); ++i)
+        for (size_t i = 0; i < n->elements.size(); ++i){
             if (i) result += ", ";
             result += checkExpr(*n->elements[i]);
-        return "tuple";
+        }
+        result += ")";//изм2
+        return result;
     }
-    result += ")";//изм2
     return "";
 }
 
