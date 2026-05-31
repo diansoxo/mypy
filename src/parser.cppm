@@ -454,10 +454,9 @@ std::expected<ExprPtr, Diagnostic> Parser::parseIdentOrCall() {
     {
         advance();
         std::string member = current().value;
-        auto member_pos = Position{current().line, current().col};
-        advance();
+        advance(); // съедаем member
+        advance(); // съедаем "("
 
-        advance();
         auto call_node = std::make_unique<Call>();
         call_node->pos = pos;
         auto callee_node = std::make_unique<Identifier>();
