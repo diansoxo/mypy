@@ -261,6 +261,8 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
 
     if (auto* n = dynamic_cast<const parser::FieldAccess*>(&expr)) {//// доступ к полю
         Value obj = evalExpr(*n->object);
+        if (obj.isString())
+            return Value(n->field);
         if (!obj.isStruct())
             runtimeError("доступ к полю не-структуры", n->pos.line);
         auto& s = obj.asStruct();
