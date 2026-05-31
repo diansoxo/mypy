@@ -1,0 +1,20 @@
+func repeat_str(s: string, n: int32) -> string {
+    let mut result: string = ""
+    let mut i: int32 = 0
+    while i < n {
+        result = result + s
+        i = i + 1
+    }
+    return result
+}
+
+func main() -> int32 {
+    let s: string = "Привет"
+    print("Длина: ")
+    println(len(s))
+    println(s + ", мир!")
+    println(repeat_str("ab", 4))
+    print("Равны: ")
+    println(s == "Привет")
+    return 0
+}

@@ -1,0 +1,44 @@
+struct Student {
+    name: string;
+    score: int32;
+}
+
+func is_passed(s: Student) -> bool {
+    return s.score >= 60
+}
+
+func best(a: Student, b: Student) -> Student {
+    if a.score >= b.score {
+        return a
+    }
+    return b
+}
+
+func main() -> int32 {
+    let s1: Student = Student { name = "Алиса", score = 92 }
+    let s2: Student = Student { name = "Борис", score = 55 }
+    let s3: Student = Student { name = "Вика",  score = 78 }
+    let students: [Student; 3] = [s1, s2, s3]
+
+    for s in students {
+        print(s.name)
+        print(": ")
+        print(s.score)
+        print(" — ")
+        if is_passed(s) {
+            println("сдал")
+        }
+        if not is_passed(s) {
+            println("не сдал")
+        }
+    }
+
+    let b: Student = best(students[0], students[2])
+    print("Лучший: ")
+    println(b.name)
+
+    assert(is_passed(students[0]))
+    println("assert прошёл")
+
+    return 0
+}

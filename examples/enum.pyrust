@@ -1,0 +1,24 @@
+enum Color {
+    Red;
+    Green;
+    Blue;
+}
+
+func color_name(c: Color) -> string {
+    match c {
+        case Color.Red   -> return "Красный"
+        case Color.Green -> return "Зелёный"
+        case Color.Blue  -> return "Синий"
+        case _           -> return "Неизвестно"
+    }
+}
+
+func main() -> int32 {
+    let c: Color = Color.Green
+    println(color_name(c))
+    let colors: [Color; 3] = [Color.Red, Color.Green, Color.Blue]
+    for col in colors {
+        println(color_name(col))
+    }
+    return 0
+}

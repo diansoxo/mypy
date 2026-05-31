@@ -1,0 +1,37 @@
+func min_max(arr: [int32; 4]) -> (int32, int32) {
+    let mut mn: int32 = arr[0]
+    let mut mx: int32 = arr[0]
+    let mut i: int32 = 1
+    while i < 4 {
+        if arr[i] < mn {
+            mn = arr[i]
+        }
+        if arr[i] > mx {
+            mx = arr[i]
+        }
+        i = i + 1
+    }
+    return (mn, mx)
+}
+
+func main() -> int32 {
+    let x: int32 = 10
+    print("внешний x: ")
+    println(x)
+
+    let y: int32 = 99
+    print("shadowing x: ")
+    println(y)
+
+    print("снова внешний x: ")
+    println(x)
+
+    let data: [int32; 4] = [5, 2, 8, 1]
+    let result: (int32, int32) = min_max(data)
+    print("min: ")
+    println(result[0])
+    print("max: ")
+    println(result[1])
+
+    return 0
+}

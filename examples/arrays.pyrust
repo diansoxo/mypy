@@ -1,0 +1,23 @@
+func sum_array(arr: [int32; 5]) -> int32 {
+    let mut total: int32 = 0
+    for x in arr {
+        total = total + x
+    }
+    return total
+}
+
+func main() -> int32 {
+    let nums: [int32; 5] = [3, 7, 1, 9, 5]
+    print("Сумма: ")
+    println(sum_array(nums))
+    print("Длина: ")
+    println(len(nums))
+    let mut i: int32 = 0
+    while i < len(nums) {
+        print(nums[i])
+        print(" ")
+        i = i + 1
+    }
+    println("")
+    return 0
+}

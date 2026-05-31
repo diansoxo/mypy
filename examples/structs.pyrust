@@ -1,0 +1,20 @@
+struct Point {
+    x: float64;
+    y: float64;
+}
+
+func distance(a: Point, b: Point) -> float64 {
+    let dx: float64 = a.x - b.x
+    let dy: float64 = a.y - b.y
+    return dx * dx + dy * dy
+}
+
+func main() -> int32 {
+    let p1: Point = Point { x = 0.0, y = 0.0 }
+    let p2: Point = Point { x = 3.0, y = 4.0 }
+    print("Квадрат расстояния: ")
+    println(distance(p1, p2))
+    print("x первой точки: ")
+    println(p1.x)
+    return 0
+}

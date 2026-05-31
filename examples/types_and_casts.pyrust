@@ -1,0 +1,32 @@
+type Meters = float64
+type Score  = int32
+
+func main() -> int32 {
+    let i: int32 = 42
+    let f: float64 = i as float64
+    print("int -> float: ")
+    println(f)
+
+    let back: int32 = f as int32
+    print("float -> int: ")
+    println(back)
+
+    let ch: char = 'A'
+    let code: int32 = ch as int32
+    print("Код 'A': ")
+    println(code)
+
+    let ch2: char = 66 as char
+    print("Символ 66: ")
+    println(ch2)
+
+    let dist: Meters = 100.0
+    print("Дистанция: ")
+    println(dist)
+
+    let s: Score = 95
+    print("Счёт: ")
+    println(s)
+
+    return 0
+}
