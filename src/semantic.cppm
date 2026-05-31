@@ -539,6 +539,9 @@ std::string SemanticAnalyzer::checkExpr(const parser::Expr& expr) {
         return "char";
  
     if (auto* n = dynamic_cast<const parser::Identifier*>(&expr)) {
+    if (enums_.count(n->name))//изм2 имя enum допустимо как префикс перед точкой
+        return n->name;
+
         const VarInfo* info = lookupVar(n->name);
         if (!info) {
             error(n->pos.line, n->pos.col, "переменная '" + n->name + "' не объявлена");
