@@ -720,6 +720,17 @@ std::string SemanticAnalyzer::checkFieldAccess(const parser::FieldAccess& node) 
     if (obj_type.empty()) return "";
  
     std::string resolved = resolveAlias(obj_type);
+
+    if (enums_.count(resolved)) {//изм2
+        auto& variants = enums_.at(resolved).variants;
+        bool found = std::find(variants.begin(), variants.end(), node.field) != variants.end();
+        if (!found)
+            error(node.pos.line, node.pos.col,
+                  "вариант '" + node.field + "' не найден в перечислении '" + resolved + "'");
+        return resolved;
+    }
+
+
     auto it = structs_.find(resolved);
     if (it == structs_.end()) {
         error(node.pos.line, node.pos.col, "тип '" + obj_type + "' не является структурой");
