@@ -228,7 +228,20 @@ void SemanticAnalyzer::collectDecl(const parser::Decl& decl) {//только з�
     
     if (auto* nd = dynamic_cast<const parser::NamespaceDecl*>(&decl)) {
         for (auto& d : nd->decls)
-            collectDecl(*d);
+            if (auto* fd = dynamic_cast<const parser::FuncDef*>(d.get())) {//изм3
+                std::string full_name = nd->name + "." + fd->name;
+                if (functions_.count(full_name)) {
+                    error(fd->pos.line, fd->pos.col,
+                        "функция '" + full_name + "' уже объявлена");
+                    continue;
+                }
+                FuncInfo info;//изм3
+                for (auto& p : fd->params)
+                    info.param_types.push_back(p.type_name);
+                info.return_type = fd->return_type.empty() ? "void" : fd->return_type;
+                functions_[full_name] = std::move(info);
+            }
+        }
         return;
     }
     
@@ -522,7 +535,7 @@ void SemanticAnalyzer::checkMatch(const parser::Match& node) {
 // Выражения 
 std::string SemanticAnalyzer::checkExpr(const parser::Expr& expr) {
     if (auto* n = dynamic_cast<const parser::IntLiteral*>(&expr))
-        return "int32";
+        return "int64";//изм3
     if (auto* n = dynamic_cast<const parser::FloatLiteral*>(&expr))
         return "float64";
     if (auto* n = dynamic_cast<const parser::StringLiteral*>(&expr))
@@ -833,7 +846,7 @@ std::string SemanticAnalyzer::checkBuiltin(
             if (!t.empty() && resolveAlias(t) != "string" && t.front() != '[')
                 error(0, 0, "'len' ожидает string или массив, получено '" + t + "'");
         }
-        return "int32";
+        return "int64";//изм3
     }
     return ""; // не встроенная
 }
