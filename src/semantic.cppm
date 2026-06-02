@@ -227,7 +227,7 @@ void SemanticAnalyzer::collectDecl(const parser::Decl& decl) {//только з�
     }
     
     if (auto* nd = dynamic_cast<const parser::NamespaceDecl*>(&decl)) {
-        for (auto& d : nd->decls)
+        for (auto& d : nd->decls){
             if (auto* fd = dynamic_cast<const parser::FuncDef*>(d.get())) {//изм3
                 std::string full_name = nd->name + "." + fd->name;
                 if (functions_.count(full_name)) {
