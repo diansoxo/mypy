@@ -17,7 +17,10 @@ export namespace interpreter {
 
 struct Value {
     using Array  = std::vector<Value>;
-    using Struct = std::unordered_map<std::string, Value>;
+    struct Struct {//доп1
+        std::string type_name; // имя структуры например "Point"
+        std::unordered_map<std::string, Value> fields;
+    };
 
     std::variant<
         std::monostate,
@@ -189,6 +192,12 @@ int Interpreter::run() {
                     functions_[nd->name + "." + fd->name] = fd;
             }
         }
+        if (auto* id = dynamic_cast<const parser::ImplDecl*>(d.get())) {// регистрация методов из impl
+            for (auto& m : id->methods) {
+                if (auto* fd = dynamic_cast<const parser::FuncDef*>(m.get()))
+                    functions_[id->name + "." + fd->name] = fd;
+            }
+        }
     }
     auto it = functions_.find("main");
     if (it == functions_.end()) {
@@ -240,8 +249,9 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
 
     if (auto* n = dynamic_cast<const parser::StructLiteral*>(&expr)) {// структура
         Value::Struct s;
+        s.type_name = n->name;//доп1
         for (auto& f : n->fields)
-            s[f.name] = evalExpr(*f.value);
+            s.fields[f.name] = evalExpr(*f.value);
         return Value(std::move(s));
     }
 
@@ -379,6 +389,13 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
         args.push_back(obj); // первый аргумент — сам объект (self)
         for (auto& a : n->args)
             args.push_back(evalExpr(*a));
+    
+    std::string method_key;//доп1 ищем "ИмяСтруктуры.имяМетода"
+    if (obj.isStruct())
+        method_key = obj.asStruct().type_name + "." + fa->field;
+    else
+        method_key = fa->field;
+
         auto it = functions_.find(fa->field);
         if (it == functions_.end())
             runtimeError("метод '" + fa->field + "' не найден", n->pos.line);
