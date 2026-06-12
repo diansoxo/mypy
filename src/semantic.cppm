@@ -666,6 +666,34 @@ std::string SemanticAnalyzer::checkUnaryOp(const parser::UnaryOp& node) {
 }
  
 std::string SemanticAnalyzer::checkCall(const parser::Call& node) {
+    if (auto* fa = dynamic_cast<const parser::FieldAccess*>(node.callee.get())) {//доп1
+    std::string obj_type = checkExpr(*fa->object);
+    std::string resolved = resolveAlias(obj_type);
+    auto sit = structs_.find(resolved);
+    if (sit == structs_.end()) {
+        error(node.pos.line, node.pos.col, "тип '" + obj_type + "' не является структурой");
+        return "";
+    }
+    std::string method_key = resolved + "." + fa->field;
+    auto fit = functions_.find(method_key);
+    if (fit == functions_.end()) {
+        error(node.pos.line, node.pos.col, "метод '" + fa->field + "' не найден в '" + resolved + "'");
+        return "";
+    }
+    // проверяем аргументы (без self)
+    auto& info = fit->second;
+    size_t expected = info.param_types.size() > 0 ? info.param_types.size() - 1 : 0;
+    if (node.args.size() != expected)
+        error(node.pos.line, node.pos.col, "метод '" + fa->field + "' ожидает " + std::to_string(expected) + " аргументов");
+    for (size_t i = 0; i < node.args.size(); ++i) {
+        std::string at = checkExpr(*node.args[i]);
+        size_t pi = i + 1; // +1 потому что 0-й это self
+        if (pi < info.param_types.size() && !typesCompatible(info.param_types[pi], at))
+            error(node.pos.line, node.pos.col, "аргумент " + std::to_string(i+1) + ": ожидается '" + info.param_types[pi] + "', получено '" + at + "'");
+    }
+    return info.return_type;
+}
+
     auto* callee_id = dynamic_cast<const parser::Identifier*>(node.callee.get());
     if (!callee_id) {
         error(node.pos.line, node.pos.col, "вызов только по имени функции");
