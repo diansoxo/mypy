@@ -84,6 +84,25 @@ void Lexer::skipWhitespaceAndComments() {
             continue;
         }
 
+        
+        if (ch == '/' && peek() == '*') {//доп6 блочные комментарии /* */
+            advance(); // /
+            advance(); // *
+            int depth = 1; // уровень вложенности
+            while (!isAtEnd() && depth > 0) {
+                if (current() == '/' && peek() == '*') {
+                    advance(); advance();
+                    depth++;
+                } else if (current() == '*' && peek() == '/') {
+                    advance(); advance();
+                    depth--;
+                } else {
+                    advance();
+                }
+            }
+            continue;
+        }
+
         if (ch == '\t') {//таб запрещен
             break;
         }
