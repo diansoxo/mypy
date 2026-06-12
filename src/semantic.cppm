@@ -732,7 +732,7 @@ std::string SemanticAnalyzer::checkCall(const parser::Call& node) {
         arg_types.push_back(checkExpr(*a));
     const FuncInfo* matched = nullptr;// ищем подходящую перегрузку
     for (auto& overload : it->second) {
-        if (overload.param_types.size() != arg_types.size()) continue;
+        if (arg_types.size() > overload.param_types.size()) continue;// совпадение точное или с дефолтными параметрами
         bool ok = true;
         for (size_t i = 0; i < arg_types.size(); ++i)
             if (!typesCompatible(overload.param_types[i], arg_types[i])) { ok = false; break; }
