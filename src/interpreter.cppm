@@ -496,7 +496,7 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
             args.push_back(evalExpr(*a));
         const parser::FuncDef* matched = nullptr;
         for (auto* fd : it->second) {
-            if (fd->params.size() == args.size()) { matched = fd; break; }
+            if (fd->params.size() >= args.size()) { matched = fd; break; }
         }
         if (!matched)
             runtimeError("нет подходящей перегрузки для '" + callee->name + "'", n->pos.line);
