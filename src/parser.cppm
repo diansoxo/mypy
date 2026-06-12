@@ -1009,7 +1009,14 @@ std::expected<std::unique_ptr<FuncDef>, Diagnostic> Parser::parseFuncDef() {
             // тип параметра
             auto type_res = parseType();
             if (!type_res) return std::unexpected(type_res.error());
- 
+
+            ExprPtr default_val;//доп2
+            if (match(TokenType::ASSIGN)) {
+                auto def_res = parseExpr();
+                if (!def_res) return std::unexpected(def_res.error());
+                 default_val = std::move(*def_res);
+            }
+
             params.push_back(Param{param_name, *type_res});
  
             // ещё параметры через запятую?
