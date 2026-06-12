@@ -214,8 +214,6 @@ namespace Math {
         │
 Semantic Analyzer
         │
-       AST
-        │
  Interpreter
  
 
