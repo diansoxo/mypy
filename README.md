@@ -229,66 +229,42 @@ mypy/
 * CMake ≥ 3.28
 * Компилятор с поддержкой C++23
 
-Проверенные компиляторы:
+Полная пересборка:
 
-* clang++ 17+
-* g++ 13+
+cd ~/mypy
 
-Сборка:
+rm -rf build
+mkdir build
+cd build
 
-```bash
-cmake -B build
-cmake --build build
-```
+cmake .. -DCMAKE_CXX_COMPILER=clang++ -G Ninja
+ninja
 
+После успешной сборки исполняемый файл будет находиться по пути:
+
+~/mypy/build/mypy
 ## Запуск
-
 Запуск программы:
 
-```bash
-./build/mypy program.pyrust
-```
+~/mypy/build/mypy ~/mypy/examples/hello.pyrust
 
-Интерактивный режим:
+Запуск с выводом токенов:
 
-```bash
-./build/mypy
-```
-
-## Отладочные режимы
-
-Вывод потока токенов:
-```bash
-./build/mypy program.pyrust --dump-tokens
-```
+~/mypy/build/mypy ~/mypy/examples/hello.pyrust --dump-tokens
 
 Вывод AST:
-```bash
-./build/mypy program.pyrust --dump-ast
-```
 
-## Пример программы
+~/mypy/build/mypy ~/mypy/examples/hello.pyrust --dump-ast
 
-```pyrust
-func fibonacci(n: int32) -> int32 {
-    if n <= 1 {
-        return n
-    }
+Примеры
 
-    return fibonacci(n - 1) + fibonacci(n - 2)
-}
+Каталог examples/ содержит примеры программ на языке PyRust.
 
-func main() -> int32 {
-    let mut i: int32 = 0
+Примеры запуска:
 
-    while i < 10 {
-        println(fibonacci(i))
-        i = i + 1
-    }
-
-    return 0
-}
-```
+~/mypy/build/mypy ~/mypy/examples/fibonacci.pyrust
+~/mypy/build/mypy ~/mypy/examples/methods.pyrust
+~/mypy/build/mypy ~/mypy/examples/test_comments.pyrust
 
 
 ## Диагностика ошибок
