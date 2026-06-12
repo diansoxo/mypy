@@ -193,6 +193,7 @@ struct Match : Stmt {
 struct Param {
     std::string name;
     std::string type_name;
+    ExprPtr default_value; //доп2 nullptr если нет дефолта
 };
  
 struct FuncDef : Decl {
