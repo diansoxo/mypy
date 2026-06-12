@@ -251,8 +251,16 @@ void SemanticAnalyzer::collectDecl(const parser::Decl& decl) {//только з�
     }
     
     if (auto* id = dynamic_cast<const parser::ImplDecl*>(&decl)) {
-        for (auto& m : id->methods)
-            collectDecl(*m); // рекурсивно собираем методы внутри
+        for (auto& m : id->methods){
+            if (auto* fd = dynamic_cast<const parser::FuncDef*>(m.get())) {
+                std::string full_name = id->name + "." + fd->name;
+                FuncInfo info;
+                for (auto& p : fd->params)
+                    info.param_types.push_back(p.type_name);
+                info.return_type = fd->return_type.empty() ? "void" : fd->return_type;
+                functions_[full_name].push_back(std::move(info));
+            }
+        }
         return;
     }
 }
