@@ -399,7 +399,7 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
     else
         method_key = fa->field;
 
-        auto it = functions_.find((method_key);
+        auto it = functions_.find(method_key);
         if (it == functions_.end())
             runtimeError("метод '" + fa->field + "' не найден", n->pos.line);
         const parser::FuncDef* matched = nullptr;
