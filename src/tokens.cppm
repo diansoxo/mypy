@@ -12,6 +12,7 @@ enum class TokenType {//типы токенов
     IF, ELSE, WHILE, FOR, IN, BREAK, CONTINUE, PASS,
     AND, OR, NOT,
     MATCH, CASE,
+    FN,//лямбда
     STRUCT, ENUM, IMPL, TYPE, NAMESPACE, AS,
     INT8, INT16, INT32, INT64,
     UINT8, UINT16, UINT32, UINT64,
@@ -58,6 +59,7 @@ static const std::unordered_map<std::string, TokenType> KEYWORDS = { //слов�
     {"not", TokenType::NOT},
     // сопоставление с образцом
     {"match", TokenType::MATCH},
+    {"fn", TokenType::FN},
     {"case", TokenType::CASE},
     // объявления типов
     {"struct", TokenType::STRUCT},
@@ -117,6 +119,7 @@ std::string tokenTypeName(TokenType t) {//принимает тип и возв�
         case TokenType::OR: return "OR";
         case TokenType::NOT: return "NOT";
         case TokenType::MATCH: return "MATCH";
+        case TokenType::FN: return "FN";
         case TokenType::CASE: return "CASE";
         case TokenType::STRUCT: return "STRUCT";
         case TokenType::ENUM: return "ENUM";
