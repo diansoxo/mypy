@@ -233,6 +233,12 @@ struct NamespaceDecl : Decl {
     std::string name; 
     std::vector<DeclPtr> decls;//изм
 };
+
+struct Lambda : Expr {// лямбда-выражение: fn(x: int32) -> int32 { return x + 1 } доп5
+    std::vector<Param> params;
+    std::string return_type;
+    std::unique_ptr<Block> body;
+};
  
 struct TypeAlias : Decl {
     std::string name;
