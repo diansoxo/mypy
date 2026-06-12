@@ -20,6 +20,9 @@ struct Value {
     struct Struct {//доп1
         std::string type_name; // имя структуры например "Point"
         std::unordered_map<std::string, Value> fields;
+        bool operator==(const Struct& o) const {
+            return type_name == o.type_name && fields == o.fields;
+        }
     };
 
     std::variant<
@@ -85,9 +88,9 @@ struct Value {
             return s + "]";
         }
         if (isStruct()) {
-            std::string s = "{";
+            std::string s =asStruct().type_name + "{";
             bool first = true;
-            for (auto& [k, v] : asStruct()) {
+            for (auto& [k, v] : asStruct().fields) {
                 if (!first) s += ", ";
                 s += k + " = " + v.toString();
                 first = false;
@@ -119,7 +122,7 @@ public:
 private:
     const parser::Program& program_;
     std::vector<std::unordered_map<std::string, Value>> scopes_;
-    std::unordered_map<std::string, const parser::FuncDef*> functions_;
+    std::unordered_map<std::string, std::vector<const parser::FuncDef*>> functions_;
 
     void pushScope();
     void popScope();
@@ -185,17 +188,17 @@ Value& Interpreter::getVar(const std::string& name, int line) {
 int Interpreter::run() {
     for (auto& d : program_.decls) {
         if (auto* fd = dynamic_cast<const parser::FuncDef*>(d.get()))
-            functions_[fd->name] = fd;
+            functions_[fd->name].push_back(fd);
         if (auto* nd = dynamic_cast<const parser::NamespaceDecl*>(d.get())) {
             for (auto& inner : nd->decls) {
                 if (auto* fd = dynamic_cast<const parser::FuncDef*>(inner.get()))
-                    functions_[nd->name + "." + fd->name] = fd;
+                    functions_[nd->name + "." + fd->name].push_back(fd);
             }
         }
         if (auto* id = dynamic_cast<const parser::ImplDecl*>(d.get())) {// регистрация методов из impl
             for (auto& m : id->methods) {
                 if (auto* fd = dynamic_cast<const parser::FuncDef*>(m.get()))
-                    functions_[id->name + "." + fd->name] = fd;
+                    functions_[id->name + "." + fd->name].push_back(fd);
             }
         }
     }
@@ -205,7 +208,7 @@ int Interpreter::run() {
         return 1;
     }
 
-    Value result = callFunc(*it->second, {}, 0);
+    Value result = callFunc(*it->second[0], {}, 0);
 
     if (result.isInt())
         return static_cast<int>(result.asInt());
@@ -276,8 +279,8 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
         if (!obj.isStruct())
             runtimeError("доступ к полю не-структуры", n->pos.line);
         auto& s = obj.asStruct();
-        auto it = s.find(n->field);
-        if (it == s.end())
+        auto it = s.fields.find(n->field);
+        if (it == s.fields.end())
             runtimeError("поле '" + n->field + "' не найдено", n->pos.line);
         return it->second;
     }
@@ -396,10 +399,16 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
     else
         method_key = fa->field;
 
-        auto it = functions_.find(fa->field);
+        auto it = functions_.find((method_key);
         if (it == functions_.end())
             runtimeError("метод '" + fa->field + "' не найден", n->pos.line);
-        return callFunc(*it->second, std::move(args), n->pos.line);
+        const parser::FuncDef* matched = nullptr;
+        for (auto* fd : it->second) {
+            if (fd->params.size() == args.size()) { matched = fd; break; }
+        }
+        if (!matched)
+            runtimeError("нет подходящей перегрузки метода '" + fa->field + "'", n->pos.line);
+        return callFunc(*matched, std::move(args), n->pos.line);
     }
 
 
@@ -418,7 +427,13 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
         std::vector<Value> args;
         for (auto& a : n->args)
             args.push_back(evalExpr(*a));
-        return callFunc(*it->second, std::move(args), n->pos.line);
+        const parser::FuncDef* matched = nullptr;
+        for (auto* fd : it->second) {
+            if (fd->params.size() == args.size()) { matched = fd; break; }
+        }
+        if (!matched)
+            runtimeError("нет подходящей перегрузки для '" + callee->name + "'", n->pos.line);
+        return callFunc(*matched, std::move(args), n->pos.line);
     }
 
     if (auto* n = dynamic_cast<const parser::EnumLiteral*>(&expr))// enum литерал
@@ -482,7 +497,7 @@ std::optional<Signal> Interpreter::execStmt(const parser::Stmt& stmt) {
             Value& obj = getVar(
                 dynamic_cast<const parser::Identifier*>(fa->object.get())->name,
                 n->pos.line);
-            obj.asStruct()[fa->field] = std::move(val);
+            obj.asStruct().fields[fa->field] = std::move(val);
             return std::nullopt;
         }
         runtimeError("неверная левая часть присваивания", n->pos.line);
@@ -582,14 +597,16 @@ std::optional<Signal> Interpreter::execStmt(const parser::Stmt& stmt) {
 //5 вызов пользовательской функции
 Value Interpreter::callFunc(const parser::FuncDef& fd, std::vector<Value> args, int line)
 {
-    
-    if (args.size() != fd.params.size())
-        runtimeError("неверное количество аргументов для '" + fd.name + "'", line);
+
     for (size_t i = args.size(); i < fd.params.size(); ++i) {// доп2 добавляем дефолтные значения для недостающих аргументов
         if (!fd.params[i].default_value)
             runtimeError("аргумент '" + fd.params[i].name + "' не передан и не имеет значения по умолчанию", line);
         args.push_back(evalExpr(*fd.params[i].default_value));
     }
+
+    if (args.size() != fd.params.size())
+        runtimeError("неверное количество аргументов для '" + fd.name + "'", line);
+
     pushScope();
 
     for (size_t i = 0; i < fd.params.size(); ++i)
