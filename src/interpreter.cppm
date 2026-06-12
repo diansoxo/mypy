@@ -585,7 +585,11 @@ Value Interpreter::callFunc(const parser::FuncDef& fd, std::vector<Value> args, 
     
     if (args.size() != fd.params.size())
         runtimeError("неверное количество аргументов для '" + fd.name + "'", line);
-
+    for (size_t i = args.size(); i < fd.params.size(); ++i) {// доп2 добавляем дефолтные значения для недостающих аргументов
+        if (!fd.params[i].default_value)
+            runtimeError("аргумент '" + fd.params[i].name + "' не передан и не имеет значения по умолчанию", line);
+        args.push_back(evalExpr(*fd.params[i].default_value));
+    }
     pushScope();
 
     for (size_t i = 0; i < fd.params.size(); ++i)
