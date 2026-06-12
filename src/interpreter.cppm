@@ -25,6 +25,12 @@ struct Value {
         }
     };
 
+    struct FuncVal {// лямбда как значение хранит параметры и тело доп5
+        std::vector<parser::Param> params;
+        std::string return_type;
+        const parser::Block* body; // не владеющий указатель, живёт пока жива Program
+        bool operator==(const FuncVal&) const { return false; } // лямбды не сравниваются
+    };
     std::variant<
         std::monostate,
         int64_t,
@@ -33,7 +39,8 @@ struct Value {
         char,
         std::string,
         Array,
-        Struct
+        Struct,
+        FuncVal
     > data;
 
     Value() : data(std::monostate{}) {}
@@ -44,6 +51,7 @@ struct Value {
     Value(std::string v) : data(std::move(v)) {}
     Value(Array v): data(std::move(v)) {}
     Value(Struct v): data(std::move(v)) {}
+    Value(FuncVal v): data(std::move(v)) {}
 
     bool isVoid()const { return std::holds_alternative<std::monostate>(data); }
     bool isInt()const { return std::holds_alternative<int64_t>(data); }
@@ -53,6 +61,7 @@ struct Value {
     bool isString()const { return std::holds_alternative<std::string>(data); }
     bool isArray()const { return std::holds_alternative<Array>(data); }
     bool isStruct()const { return std::holds_alternative<Struct>(data); }
+    bool isFuncVal()const { return std::holds_alternative<FuncVal>(data); }//доп5
 
     int64_t asInt() const { return std::get<int64_t>(data); }
     double asFloat() const { return std::get<double>(data); }
@@ -63,6 +72,8 @@ struct Value {
     const Array& asArray() const { return std::get<Array>(data); }
     Struct& asStruct() { return std::get<Struct>(data); }
     const Struct& asStruct() const { return std::get<Struct>(data); }
+    FuncVal& asFuncVal() { return std::get<FuncVal>(data); }//доп5
+    const FuncVal& asFuncVal() const { return std::get<FuncVal>(data); }//доп5
 
     std::string toString() const {
         if (isVoid()) return "void";
@@ -97,6 +108,7 @@ struct Value {
             }
             return s + "}";
         }
+        if (isFuncVal()) return "<fn>";//доп5
         return "<unknown>";
     }
 
@@ -411,6 +423,35 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
         return callFunc(*matched, std::move(args), n->pos.line);
     }
 
+        
+        if (!dynamic_cast<const parser::Identifier*>(n->callee.get()) &&//доп5 вызов лямбды через переменную: let f = fn(...) {...}; f(args)
+            !dynamic_cast<const parser::FieldAccess*>(n->callee.get())) {
+            Value callee_val = evalExpr(*n->callee);
+            if (!callee_val.isFuncVal())
+                runtimeError("вызов не-функции", n->pos.line);
+            auto& fv = callee_val.asFuncVal();
+            std::vector<Value> args;
+            for (auto& a : n->args)
+                args.push_back(evalExpr(*a));
+            // подставляем дефолты
+            for (size_t i = args.size(); i < fv.params.size(); ++i) {
+                if (!fv.params[i].default_value)
+                    runtimeError("аргумент '" + fv.params[i].name + "' не передан", n->pos.line);
+                args.push_back(evalExpr(*fv.params[i].default_value));
+            }
+            if (args.size() != fv.params.size())
+                runtimeError("неверное количество аргументов лямбды", n->pos.line);
+            pushScope();
+            for (size_t i = 0; i < fv.params.size(); ++i)
+                declareVar(fv.params[i].name, std::move(args[i]));
+            std::optional<Signal> sig;
+            if (fv.body) sig = execBlock(*fv.body);
+            popScope();
+            if (sig && std::holds_alternative<ReturnSignal>(*sig))
+                return std::get<ReturnSignal>(*sig).value;
+            return Value();
+        }
+
 
         auto* callee = dynamic_cast<const parser::Identifier*>(n->callee.get());
         if (!callee)
@@ -419,6 +460,34 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
 
         if (isBuiltinName(callee->name))//изм2
             return callBuiltin(callee->name, n->args, n->pos.line);
+
+       
+        for (int si = static_cast<int>(scopes_.size()) - 1; si >= 0; --si) { //доп5 сначала проверяем не лямбда ли это в переменной
+            auto vit = scopes_[si].find(callee->name);
+            if (vit != scopes_[si].end() && vit->second.isFuncVal()) {
+                auto& fv = vit->second.asFuncVal();
+                std::vector<Value> args;
+                for (auto& a : n->args)
+                    args.push_back(evalExpr(*a));
+                for (size_t i = args.size(); i < fv.params.size(); ++i) {
+                    if (!fv.params[i].default_value)
+                        runtimeError("аргумент '" + fv.params[i].name + "' не передан", n->pos.line);
+                    args.push_back(evalExpr(*fv.params[i].default_value));
+                }
+                if (args.size() != fv.params.size())
+                    runtimeError("неверное количество аргументов лямбды", n->pos.line);
+                pushScope();
+                for (size_t i = 0; i < fv.params.size(); ++i)
+                    declareVar(fv.params[i].name, std::move(args[i]));
+                std::optional<Signal> sig;
+                if (fv.body) sig = execBlock(*fv.body);
+                popScope();
+                if (sig && std::holds_alternative<ReturnSignal>(*sig))
+                    return std::get<ReturnSignal>(*sig).value;
+                return Value();
+            }
+        }
+
 
         auto it = functions_.find(callee->name);// пользовательская функция
         if (it == functions_.end())
@@ -434,6 +503,14 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
         if (!matched)
             runtimeError("нет подходящей перегрузки для '" + callee->name + "'", n->pos.line);
         return callFunc(*matched, std::move(args), n->pos.line);
+    }
+
+    if (auto* n = dynamic_cast<const parser::Lambda*>(&expr)) {//доп5
+        Value::FuncVal fv;
+        fv.params = n->params;
+        fv.return_type = n->return_type;
+        fv.body = n->body.get();
+        return Value(std::move(fv));
     }
 
     if (auto* n = dynamic_cast<const parser::EnumLiteral*>(&expr))// enum литерал
