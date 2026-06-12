@@ -46,7 +46,7 @@ private:
     std::string filename_;//имя файла для диагностики
     std::vector<Diagnostic> diagnostics_;//список всех ошибок найденных
     std::vector<std::unordered_map<std::string, VarInfo>> scopes_;//какие переменные сейчас видны?
-    std::unordered_map<std::string, FuncInfo> functions_;
+    std::unordered_map<std::string, std::vector<FuncInfo>> functions_;//доп4
     std::unordered_map<std::string, StructInfo> structs_;//какие структуры существуют?
     std::unordered_map<std::string, EnumInfo> enums_;//какие enum существуют?
     std::unordered_map<std::string, std::string> type_aliases_;//какие псевдонимы типов существуют?
@@ -179,12 +179,21 @@ AnalysisResult SemanticAnalyzer::analyze(const parser::Program& program) {
 void SemanticAnalyzer::collectDecl(const parser::Decl& decl) {//только записываем имена
 
     if (auto* fd = dynamic_cast<const parser::FuncDef*>(&decl)) {
-        // проверяем что функция с таким именем ещё не объявлена
-        if (functions_.count(fd->name)) {
-            error(fd->pos.line, fd->pos.col,
-                  "функция '" + fd->name + "' уже объявлена");
-            return;
+        FuncInfo info;//доп4
+        for (auto& p : fd->params)
+            info.param_types.push_back(p.type_name);
+        info.return_type = fd->return_type.empty() ? "void" : fd->return_type;
+        // проверяем нет ли уже перегрузки с теми же типами параметров
+        auto& overloads = functions_[fd->name];
+        for (auto& existing : overloads) {
+            if (existing.param_types == info.param_types) {
+                error(fd->pos.line, fd->pos.col, "функция '" + fd->name + "' с такими типами параметров уже объявлена");
+                return;
+            }
         }
+        overloads.push_back(std::move(info));
+        return;
+     }
         // собираем сигнатуру- только типы параметров и тип возврата
         FuncInfo info;
         for (auto& p : fd->params)
@@ -705,14 +714,31 @@ std::string SemanticAnalyzer::checkCall(const parser::Call& node) {
     if (!builtin.empty()) return builtin;
  
     auto it = functions_.find(name);
-    if (it == functions_.end()) {
-        error(node.pos.line, node.pos.col,
-              "функция '" + name + "' не объявлена");
-        // всё равно проверяем аргументы чтобы не пропустить ошибки внутри
+    if (it == functions_.end()) {//доп4
+        error(node.pos.line, node.pos.col, "функция '" + name + "' не объявлена");
         for (auto& a : node.args) checkExpr(*a);
         return "";
     }
- 
+    std::vector<std::string> arg_types;// собираем типы аргументов
+    for (auto& a : node.args)
+        arg_types.push_back(checkExpr(*a));
+    const FuncInfo* matched = nullptr;// ищем подходящую перегрузку
+    for (auto& overload : it->second) {
+        if (overload.param_types.size() != arg_types.size()) continue;
+        bool ok = true;
+        for (size_t i = 0; i < arg_types.size(); ++i)
+            if (!typesCompatible(overload.param_types[i], arg_types[i])) { ok = false; break; }
+        if (ok) { matched = &overload; break; }
+    }
+    if (!matched) {
+        error(node.pos.line, node.pos.col, "нет подходящей перегрузки функции '" + name + "'");
+        return "";
+    }
+    return matched->return_type;
+            return "";
+        }
+
+
     auto& info = it->second;
  
     // количество аргументов
