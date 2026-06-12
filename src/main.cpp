@@ -43,6 +43,51 @@ static void dumpAst(const parser::Program& program) {
     }
 }
 
+static void runRepl() {//доп3
+    std::cout << "MyLang REPL. Введите 'exit(0)' для выхода.\n";
+    
+    // накапливаем все объявления между итерациями
+    parser::Program accumulated;
+    
+    while (true) {
+        std::cout << ">>> ";
+        std::string line;
+        if (!std::getline(std::cin, line)) break;
+        if (line.empty()) continue;
+        
+        lexer::Lexer lex(line, "<repl>");
+        auto tok_result = lex.tokenize();
+        if (!tok_result) {
+            tok_result.error().print();
+            continue;
+        }
+        
+        parser::Parser p(std::move(*tok_result), "<repl>");
+        auto parse_result = p.parse();
+        if (!parse_result.ok()) {
+            for (auto& e : parse_result.errors) e.print();
+            continue;
+        }
+        
+        // добавляем новые объявления к накопленным
+        for (auto& d : parse_result.program.decls)
+            accumulated.decls.push_back(std::move(d));
+        
+        semantic::SemanticAnalyzer sa("<repl>");
+        auto sem_result = sa.analyze(accumulated);
+        if (!sem_result.ok()) {
+            // откатываем последнее добавленное
+            for (size_t i = 0; i < parse_result.program.decls.size(); ++i)
+                accumulated.decls.pop_back();
+            for (auto& e : sem_result.errors) e.print();
+            continue;
+        }
+        
+        interpreter::Interpreter interp(accumulated);
+        interp.run();
+    }
+}
+
 int main(int argc, char* argv[]) {
     std::string source_file;
     bool dump_tokens = false;
@@ -59,8 +104,8 @@ int main(int argc, char* argv[]) {
     }
 
     if (source_file.empty()) {
-        std::cerr << "использование: mypy <source file> [--dump-tokens] [--dump-ast]\n";
-        return 1;
+        runRepl();//доп3
+        return 0;
     }
 
     std::string source = readFile(source_file);
