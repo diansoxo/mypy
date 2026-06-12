@@ -601,6 +601,9 @@ std::string SemanticAnalyzer::checkExpr(const parser::Expr& expr) {
     }
  
     // TupleLiteral просто проверяем элементы, тип не выводим
+    if (auto* n = dynamic_cast<const parser::Lambda*>(&expr)) {
+        return "<fn>";// лямбда как значение — возвращаем специальный тип
+    }
     if (auto* n = dynamic_cast<const parser::TupleLiteral*>(&expr)) {
         std::string result = "(";//изм2
         for (size_t i = 0; i < n->elements.size(); ++i){
@@ -721,8 +724,15 @@ std::string SemanticAnalyzer::checkCall(const parser::Call& node) {
     std::string builtin = checkBuiltin(name, node.args);
     if (!builtin.empty()) return builtin;
  
+    // проверяем не является ли это переменной-лямбдой
+    const VarInfo* var = lookupVar(name);
+    if (var && var->type_name == "<fn>") {
+        for (auto& a : node.args) checkExpr(*a);
+        return ""; // тип возврата неизвестен статически
+    }
+
     auto it = functions_.find(name);
-    if (it == functions_.end()) {//доп4
+    if (it == functions_.end()) {
         error(node.pos.line, node.pos.col, "функция '" + name + "' не объявлена");
         for (auto& a : node.args) checkExpr(*a);
         return "";
