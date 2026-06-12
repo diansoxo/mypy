@@ -404,6 +404,46 @@ std::expected<ExprPtr, Diagnostic> Parser::parsePrimary() {//изм
     if (check(TokenType::IDENTIFIER)) {
         return parseIdentOrCall();
     }
+
+    if (check(TokenType::FN)) {//доп5
+        auto pos = Position{current().line, current().col};
+        advance(); // fn
+        auto lp = expect(TokenType::LPAREN, "ожидается '(' после 'fn'");
+        if (!lp) return std::unexpected(lp.error());
+        std::vector<Param> params;
+        if (!check(TokenType::RPAREN)) {
+            while (true) {
+                if (!check(TokenType::IDENTIFIER))
+                    return std::unexpected(makeDiag("ожидается имя параметра"));
+                std::string pname = current().value;
+                advance();
+                auto colon = expect(TokenType::COLON, "ожидается ':'");
+                if (!colon) return std::unexpected(colon.error());
+                auto type_res = parseType();
+                if (!type_res) return std::unexpected(type_res.error());
+                params.push_back(Param{pname, *type_res, nullptr});
+                if (!match(TokenType::COMMA)) break;
+            }
+        }
+        auto rp = expect(TokenType::RPAREN, "ожидается ')'");
+        if (!rp) return std::unexpected(rp.error());
+        std::string ret_type;
+        if (match(TokenType::ARROW)) {
+            auto tr = parseType();
+            if (!tr) return std::unexpected(tr.error());
+            ret_type = *tr;
+        }
+        skipNewlines();
+        auto body_res = parseBlock();
+        if (!body_res) return std::unexpected(body_res.error());
+        auto node = std::make_unique<Lambda>();
+        node->pos = pos;
+        node->params = std::move(params);
+        node->return_type = ret_type;
+        node->body = std::move(*body_res);
+        return node;
+    }
+
     if (check(TokenType::LBRACKET)) {
         return parseArrayLiteral();
     }
