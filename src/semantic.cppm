@@ -244,7 +244,7 @@ void SemanticAnalyzer::collectDecl(const parser::Decl& decl) {//только з�
                 for (auto& p : fd->params)
                     info.param_types.push_back(p.type_name);
                 info.return_type = fd->return_type.empty() ? "void" : fd->return_type;
-                functions_[full_name] = std::move(info);
+                functions_[full_name].push_back(std::move(info));
             }
         }
         return;
