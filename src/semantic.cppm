@@ -735,25 +735,7 @@ std::string SemanticAnalyzer::checkCall(const parser::Call& node) {
         return "";
     }
     return matched->return_type;
-            return "";
         }
-
-
-    auto& info = it->second;
- 
-    // количество аргументов
-    if (node.args.size() != info.param_types.size())
-        error(node.pos.line, node.pos.col,"функция '" + name + "' ожидает " + std::to_string(info.param_types.size()) + " аргументов, передано " + std::to_string(node.args.size()));
- 
-    // типы аргументов
-    for (size_t i = 0; i < node.args.size(); ++i) {
-        std::string at = checkExpr(*node.args[i]);
-        if (i < info.param_types.size() && !typesCompatible(info.param_types[i], at))
-            error(node.pos.line, node.pos.col, "аргумент " + std::to_string(i + 1) + " функции '" + name + "': ожидается '" + info.param_types[i] + "', получено '" + at + "'");
-    }
- 
-    return info.return_type;
-}
  
 std::string SemanticAnalyzer::checkArrayAccess(const parser::ArrayAccess& node) {
     std::string base_type = checkExpr(*node.base);
