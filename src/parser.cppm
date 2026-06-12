@@ -499,10 +499,15 @@ std::expected<ExprPtr, Diagnostic> Parser::parseIdentOrCall() {
 
         auto call_node = std::make_unique<Call>();
         call_node->pos = pos;
-        auto callee_node = std::make_unique<Identifier>();
-        callee_node->pos = pos;
-        callee_node->name = name + "." + member;
-        call_node->callee = std::move(callee_node);
+        // создаём FieldAccess(obj, method) вместо Identifier("obj.method")
+        auto obj_node = std::make_unique<Identifier>();
+        obj_node->pos = pos;
+        obj_node->name = name;
+        auto fa_node = std::make_unique<FieldAccess>();
+        fa_node->pos = pos;
+        fa_node->object = std::move(obj_node);
+        fa_node->field = member;
+        call_node->callee = std::move(fa_node);
         if (!check(TokenType::RPAREN)) {
             while (true) {
                 auto arg_res = parseExpr();
@@ -1057,7 +1062,7 @@ std::expected<std::unique_ptr<FuncDef>, Diagnostic> Parser::parseFuncDef() {
                  default_val = std::move(*def_res);
             }
 
-            params.push_back(Param{param_name, *type_res});
+            params.push_back(Param{param_name, *type_res,std::move(default_val)});
  
             // ещё параметры через запятую?
             if (!match(TokenType::COMMA)) break;
