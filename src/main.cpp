@@ -70,6 +70,7 @@ static void runRepl() {//доп3
         }
         
         // добавляем новые объявления к накопленным
+        size_t added = parse_result.program.decls.size();
         for (auto& d : parse_result.program.decls)
             accumulated.decls.push_back(std::move(d));
         
@@ -77,7 +78,7 @@ static void runRepl() {//доп3
         auto sem_result = sa.analyze(accumulated);
         if (!sem_result.ok()) {
             // откатываем последнее добавленное
-            for (size_t i = 0; i < parse_result.program.decls.size(); ++i)
+            for (size_t i = 0; i < added; ++i)
                 accumulated.decls.pop_back();
             for (auto& e : sem_result.errors) e.print();
             continue;
