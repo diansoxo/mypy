@@ -26,9 +26,7 @@ struct Value {
     };
 
     struct FuncVal {// лямбда как значение хранит параметры и тело доп5
-        std::vector<parser::Param> params;
-        std::string return_type;
-        const parser::Block* body; // не владеющий указатель, живёт пока жива Program
+        const parser::Lambda* lambda;
         bool operator==(const FuncVal&) const { return false; } // лямбды не сравниваются
     };
     std::variant<
@@ -434,18 +432,18 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
             for (auto& a : n->args)
                 args.push_back(evalExpr(*a));
             // подставляем дефолты
-            for (size_t i = args.size(); i < fv.params.size(); ++i) {
-                if (!fv.params[i].default_value)
-                    runtimeError("аргумент '" + fv.params[i].name + "' не передан", n->pos.line);
-                args.push_back(evalExpr(*fv.params[i].default_value));
+            for (size_t i = args.size(); i < fv.lambda->params.size(); ++i) {
+                if (!fv.lambda->params[i].default_value)
+                    runtimeError("аргумент '" + fv.lambda->params[i].name + "' не передан", n->pos.line);
+                args.push_back(evalExpr(*fv.lambda->params[i].default_value));
             }
-            if (args.size() != fv.params.size())
+            if (args.size() != fv.lambda->params.size())
                 runtimeError("неверное количество аргументов лямбды", n->pos.line);
             pushScope();
-            for (size_t i = 0; i < fv.params.size(); ++i)
-                declareVar(fv.params[i].name, std::move(args[i]));
+            for (size_t i = 0; i < fv.lambda->params.size(); ++i)
+                declareVar(fv.lambda->params[i].name, std::move(args[i]));
             std::optional<Signal> sig;
-            if (fv.body) sig = execBlock(*fv.body);
+            if (fv.lambda->body) sig = execBlock(*fv.lambda->body);
             popScope();
             if (sig && std::holds_alternative<ReturnSignal>(*sig))
                 return std::get<ReturnSignal>(*sig).value;
@@ -469,18 +467,18 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
                 std::vector<Value> args;
                 for (auto& a : n->args)
                     args.push_back(evalExpr(*a));
-                for (size_t i = args.size(); i < fv.params.size(); ++i) {
-                    if (!fv.params[i].default_value)
-                        runtimeError("аргумент '" + fv.params[i].name + "' не передан", n->pos.line);
-                    args.push_back(evalExpr(*fv.params[i].default_value));
+                for (size_t i = args.size(); i < fv.lambda->params.size(); ++i) {
+                    if (!fv.lambda->params[i].default_value)
+                        runtimeError("аргумент '" + fv.lambda->params[i].name + "' не передан", n->pos.line);
+                    args.push_back(evalExpr(*fv.lambda->params[i].default_value));
                 }
-                if (args.size() != fv.params.size())
+                if (args.size() != fv.lambda->params.size())
                     runtimeError("неверное количество аргументов лямбды", n->pos.line);
                 pushScope();
-                for (size_t i = 0; i < fv.params.size(); ++i)
-                    declareVar(fv.params[i].name, std::move(args[i]));
+                for (size_t i = 0; i < fv.lambda->params.size(); ++i)
+                    declareVar(fv.lambda->params[i].name, std::move(args[i]));
                 std::optional<Signal> sig;
-                if (fv.body) sig = execBlock(*fv.body);
+                if (fv.lambda->body) sig = execBlock(*fv.lambda->body);
                 popScope();
                 if (sig && std::holds_alternative<ReturnSignal>(*sig))
                     return std::get<ReturnSignal>(*sig).value;
@@ -507,9 +505,7 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
 
     if (auto* n = dynamic_cast<const parser::Lambda*>(&expr)) {//доп5
         Value::FuncVal fv;
-        fv.params = n->params;
-        fv.return_type = n->return_type;
-        fv.body = n->body.get();
+        fv.lambda = n;
         return Value(std::move(fv));
     }
 
