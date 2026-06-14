@@ -770,9 +770,9 @@ std::string SemanticAnalyzer::checkCall(const parser::Call& node) {
                 std::string p = resolveAlias(overload.param_types[i]);
                 int c = 0;
                 if (a == p) c = 0;
-                else if ((a=="int8"||a=="int16"||a=="int32"||a=="int64"||
-                          a=="uint8"||a=="uint16"||a=="uint32"||a=="uint64") &&
-                         (p=="float32"||p=="float64")) c = 1;
+                else if ((a=="int8"||a=="int16"||a=="int32"||a=="int64"||a=="uint8"||a=="uint16"||a=="uint32"||a=="uint64") && (p=="float32"||p=="float64")) c = 1;
+                else if ((a=="int8"||a=="int16"||a=="int32"||a=="int64"|| a=="uint8"||a=="uint16"||a=="uint32"||a=="uint64") &&p=="string") c = 2;
+                else if (a=="string" &&(p=="int8"||p=="int16"||p=="int32"||p=="int64"||p=="uint8"||p=="uint16"||p=="uint32"||p=="uint64")) c = 2;
                 else { ok = false; break; }
                 total += c;
             }
