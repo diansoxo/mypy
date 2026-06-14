@@ -742,11 +742,18 @@ std::string SemanticAnalyzer::checkCall(const parser::Call& node) {
         arg_types.push_back(checkExpr(*a));
     const FuncInfo* matched = nullptr;// ищем подходящую перегрузку
     for (auto& overload : it->second) {
-        if (arg_types.size() > overload.param_types.size()) continue;// совпадение точное или с дефолтными параметрами
+        if (arg_types.size() > overload.param_types.size()) continue;
         bool ok = true;
         for (size_t i = 0; i < arg_types.size(); ++i)
             if (!typesCompatible(overload.param_types[i], arg_types[i])) { ok = false; break; }
         if (ok) { matched = &overload; break; }
+    }
+    // шаг 2: если не нашли — ищем по числу аргументов без проверки типов
+    // (типы могут быть пустыми строками если уже была ошибка выше)
+    if (!matched) {
+        for (auto& overload : it->second) {
+            if (arg_types.size() <= overload.param_types.size()) { matched = &overload; break; }
+        }
     }
     if (!matched) {
         error(node.pos.line, node.pos.col, "нет подходящей перегрузки функции '" + name + "'");
