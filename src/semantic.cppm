@@ -751,8 +751,12 @@ std::string SemanticAnalyzer::checkCall(const parser::Call& node) {
     // шаг 2: если не нашли — ищем по числу аргументов без проверки типов
     // (типы могут быть пустыми строками если уже была ошибка выше)
     if (!matched) {
-        for (auto& overload : it->second) {
-            if (arg_types.size() <= overload.param_types.size()) { matched = &overload; break; }
+        bool has_empty = false;
+        for (auto& t : arg_types) if (t.empty()) { has_empty = true; break; }
+        if (has_empty) {
+            for (auto& overload : it->second) {
+                if (arg_types.size() <= overload.param_types.size()) { matched = &overload; break; }
+            }
         }
     }
     if (!matched) {
