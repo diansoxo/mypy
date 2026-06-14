@@ -131,6 +131,9 @@ public:
 
 private:
     static bool valueMatchesType(const Value& val, const std::string& type_name);
+
+    static int implicitCost(const Value& val, const std::string& type_name);
+    static Value applyImplicitConv(Value val, const std::string& type_name);
     const parser::Program& program_;
     std::vector<std::unordered_map<std::string, Value>> scopes_;
     std::unordered_map<std::string, std::vector<const parser::FuncDef*>> functions_;
@@ -236,6 +239,19 @@ bool Interpreter::valueMatchesType(const Value& val, const std::string& type_nam
     if (val.isArray() && !type_name.empty() && type_name[0]=='[') return true;
     if (val.isStruct() && val.asStruct().type_name == type_name) return true;
     return false;
+}
+
+int Interpreter::implicitCost(const Value& val, const std::string& type_name) {
+    if (type_name.empty()) return 0;
+    if (valueMatchesType(val, type_name)) return 0;
+    if (val.isInt() && (type_name=="float32"||type_name=="float64")) return 1;
+    return -1;
+}
+
+Value Interpreter::applyImplicitConv(Value val, const std::string& type_name) {
+    if (val.isInt() && (type_name=="float32"||type_name=="float64"))
+        return Value(static_cast<double>(val.asInt()));
+    return val;
 }
 
 //3 evalExpr
@@ -435,10 +451,36 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
                 if (!valueMatchesType(args[i], fd->params[i].type_name)) { ok = false; break; }
             if (ok) { matched = fd; break; }
         }
+        // шаг 2 неявные приведения
+        if (!matched) {
+            int best_cost = INT_MAX;
+            int ambig_count = 0;
+            
+            for (auto* fd : it->second) {
+                size_t req = 0;
+                for (auto& p : fd->params) if (!p.default_value) req++;
+                if (args.size() < req || args.size() > fd->params.size()) continue;
+                int total = 0; bool ok = true;
+                for (size_t i = 0; i < args.size(); ++i) {
+                    int c = implicitCost(args[i], fd->params[i].type_name);
+                    if (c < 0) { ok = false; break; }
+                    total += c;
+                }
+                if (!ok) continue;
+                if (total < best_cost) { best_cost = total; matched = fd; ambig_count = 1; }
+                else if (total == best_cost) ambig_count++;
+            }
+            if (ambig_count > 1)
+                runtimeError("неоднозначный вызов: несколько перегрузок одинаково подходят", n->pos.line);
+        }
+
         if (!matched)
             runtimeError("нет подходящей перегрузки метода '" + fa->field + "'", n->pos.line);
+        for (size_t i = 0; i < args.size(); ++i)// применяем неявные приведения к аргументам перед вызовом
+            args[i] = applyImplicitConv(std::move(args[i]), matched->params[i].type_name);
         return callFunc(*matched, std::move(args), n->pos.line);
     }
+
 
         
         if (!dynamic_cast<const parser::Identifier*>(n->callee.get()) &&//доп5 вызов лямбды через переменную: let f = fn(...) {...}; f(args)
@@ -523,8 +565,33 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
                 if (!valueMatchesType(args[i], fd->params[i].type_name)) { ok = false; break; }
             if (ok) { matched = fd; break; }
         }
+
+// доп3ур неявные приведения
+        if (!matched) {
+            int best_cost = INT_MAX;
+            int ambig_count = 0;
+            for (auto* fd : it->second) {
+                size_t req = 0;
+                for (auto& p : fd->params) if (!p.default_value) req++;
+                if (args.size() < req || args.size() > fd->params.size()) continue;
+                int total = 0; bool ok = true;
+                for (size_t i = 0; i < args.size(); ++i) {
+                    int c = implicitCost(args[i], fd->params[i].type_name);
+                    if (c < 0) { ok = false; break; }
+                    total += c;
+                }
+                if (!ok) continue;
+                if (total < best_cost) { best_cost = total; matched = fd; ambig_count = 1; }
+                else if (total == best_cost) ambig_count++;
+            }
+            if (ambig_count > 1)
+                runtimeError("неоднозначный вызов: несколько перегрузок одинаково подходят", n->pos.line);
+        }
+
         if (!matched)
             runtimeError("нет подходящей перегрузки для '" + callee->name + "'", n->pos.line);
+        for (size_t i = 0; i < args.size(); ++i)// применяем неявные приведения к аргументам перед вызовом
+            args[i] = applyImplicitConv(std::move(args[i]), matched->params[i].type_name);
         return callFunc(*matched, std::move(args), n->pos.line);
     }
 
