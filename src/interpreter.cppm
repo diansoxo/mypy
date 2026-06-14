@@ -130,6 +130,7 @@ public:
     int run();
 
 private:
+    static bool valueMatchesType(const Value& val, const std::string& type_name);
     const parser::Program& program_;
     std::vector<std::unordered_map<std::string, Value>> scopes_;
     std::unordered_map<std::string, std::vector<const parser::FuncDef*>> functions_;
@@ -223,6 +224,18 @@ int Interpreter::run() {
     if (result.isInt())
         return static_cast<int>(result.asInt());
     return 0;
+}
+
+bool Interpreter::valueMatchesType(const Value& val, const std::string& type_name) {
+    if (type_name.empty()) return true;
+    if (val.isInt() && (type_name=="int8"||type_name=="int16"|| type_name=="int32"||type_name=="int64"|| type_name=="uint8"||type_name=="uint16"|| type_name=="uint32"||type_name=="uint64")) return true;
+    if (val.isFloat() && (type_name=="float32"||type_name=="float64")) return true;
+    if (val.isBool() && type_name=="bool") return true;
+    if (val.isChar() && type_name=="char") return true;
+    if (val.isString() && type_name=="string") return true;
+    if (val.isArray() && !type_name.empty() && type_name[0]=='[') return true;
+    if (val.isStruct() && val.asStruct().type_name == type_name) return true;
+    return false;
 }
 
 //3 evalExpr
@@ -414,7 +427,13 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
             runtimeError("метод '" + fa->field + "' не найден", n->pos.line);
         const parser::FuncDef* matched = nullptr;
         for (auto* fd : it->second) {
-            if (fd->params.size() == args.size()) { matched = fd; break; }
+            size_t req = 0;
+            for (auto& p : fd->params) if (!p.default_value) req++;
+            if (args.size() < req || args.size() > fd->params.size()) continue;
+            bool ok = true;
+            for (size_t i = 0; i < args.size(); ++i)
+                if (!valueMatchesType(args[i], fd->params[i].type_name)) { ok = false; break; }
+            if (ok) { matched = fd; break; }
         }
         if (!matched)
             runtimeError("нет подходящей перегрузки метода '" + fa->field + "'", n->pos.line);
@@ -496,7 +515,13 @@ Value Interpreter::evalExpr(const parser::Expr& expr) {
             args.push_back(evalExpr(*a));
         const parser::FuncDef* matched = nullptr;
         for (auto* fd : it->second) {
-            if (fd->params.size() >= args.size()) { matched = fd; break; }
+            size_t req = 0;
+            for (auto& p : fd->params) if (!p.default_value) req++;
+            if (args.size() < req || args.size() > fd->params.size()) continue;
+            bool ok = true;
+            for (size_t i = 0; i < args.size(); ++i)
+                if (!valueMatchesType(args[i], fd->params[i].type_name)) { ok = false; break; }
+            if (ok) { matched = fd; break; }
         }
         if (!matched)
             runtimeError("нет подходящей перегрузки для '" + callee->name + "'", n->pos.line);
