@@ -760,6 +760,33 @@ std::string SemanticAnalyzer::checkCall(const parser::Call& node) {
         }
     }
     if (!matched) {
+        int best_cost = INT_MAX;
+        int ambig_count = 0;
+        for (auto& overload : it->second) {
+            if (arg_types.size() > overload.param_types.size()) continue;
+            int total = 0; bool ok = true;
+            for (size_t i = 0; i < arg_types.size(); ++i) {
+                std::string a = resolveAlias(arg_types[i]);
+                std::string p = resolveAlias(overload.param_types[i]);
+                int c = 0;
+                if (a == p) c = 0;
+                else if ((a=="int8"||a=="int16"||a=="int32"||a=="int64"||
+                          a=="uint8"||a=="uint16"||a=="uint32"||a=="uint64") &&
+                         (p=="float32"||p=="float64")) c = 1;
+                else { ok = false; break; }
+                total += c;
+            }
+            if (!ok) continue;
+            if (total < best_cost) { best_cost = total; matched = &overload; ambig_count = 1; }
+            else if (total == best_cost) ambig_count++;
+        }
+        if (ambig_count > 1) {
+            error(node.pos.line, node.pos.col,
+                  "неоднозначный вызов функции '" + name + "': несколько перегрузок одинаково подходят");
+            return "";;
+        }
+    }
+    if (!matched) {
         error(node.pos.line, node.pos.col, "нет подходящей перегрузки функции '" + name + "'");
         return "";
     }
