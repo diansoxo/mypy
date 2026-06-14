@@ -245,12 +245,20 @@ int Interpreter::implicitCost(const Value& val, const std::string& type_name) {
     if (type_name.empty()) return 0;
     if (valueMatchesType(val, type_name)) return 0;
     if (val.isInt() && (type_name=="float32"||type_name=="float64")) return 1;
+    if (val.isInt() && type_name=="string") return 2;
+    if (val.isString() && (type_name=="int32"||type_name=="int64")) return 2;
     return -1;
 }
 
 Value Interpreter::applyImplicitConv(Value val, const std::string& type_name) {
     if (val.isInt() && (type_name=="float32"||type_name=="float64"))
         return Value(static_cast<double>(val.asInt()));
+    if (val.isInt() && type_name=="string")
+        return Value(std::to_string(val.asInt()));
+    if (val.isString() && (type_name=="int32"||type_name=="int64")) {
+        try { return Value(static_cast<int64_t>(std::stoll(val.asString()))); }
+        catch (...) { runtimeError("не удалось привести строку '" + val.asString() + "' к int", 0); }
+    }
     return val;
 }
 
